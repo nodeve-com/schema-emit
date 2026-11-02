@@ -1,0 +1,205 @@
+[
+    {
+        "description": "allOf merges fields by name, and a field's checks from each subschema apply",
+        "schema": {
+            "type": "object",
+            "properties": { "n": { "type": "integer", "minimum": 0, "allOf": [{ "maximum": 10 }] } },
+            "allOf": [{ "properties": { "n": { "maximum": 20 } } }, { "required": ["n"] }]
+        },
+        "tests": [
+            { "description": "in every range", "data": { "n": 5 }, "valid": true, "failures": [] },
+            { "description": "past the first subschema's bound", "data": { "n": 11 }, "valid": false, "failures": ["Value.n: range"] },
+            { "description": "absent, which the second subschema requires", "data": {}, "valid": false, "failures": ["Value.n: absent"] }
+        ]
+    },
+    {
+        "description": "allOf with a closed object refuses a field another subschema adds",
+        "schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": { "a": { "type": "integer" } },
+            "allOf": [{ "properties": { "b": { "type": "integer" } } }]
+        },
+        "tests": [
+            { "description": "refused", "data": { "a": 1 }, "valid": true, "failures": [] }
+        ]
+    },
+    {
+        "description": "allOf with a closed subschema refuses a field the object adds",
+        "schema": {
+            "type": "object",
+            "properties": { "a": { "type": "integer" }, "b": { "type": "integer" } },
+            "allOf": [{ "additionalProperties": false, "properties": { "a": { "type": "integer" } } }]
+        },
+        "tests": [
+            { "description": "refused", "data": { "a": 1 }, "valid": true, "failures": [] }
+        ]
+    },
+    {
+        "description": "allOf with a closed subschema naming every field merges",
+        "schema": {
+            "type": "object",
+            "properties": { "a": { "type": "integer" } },
+            "allOf": [{ "additionalProperties": false, "properties": { "a": { "minimum": 0 } } }]
+        },
+        "tests": [
+            { "description": "a valid field", "data": { "a": 3 }, "valid": true, "failures": [] },
+            { "description": "a negative field", "data": { "a": -3 }, "valid": false, "failures": ["Value.a: range"] }
+        ]
+    },
+    {
+        "description": "allOf refuses a field both subschemas type differently",
+        "schema": {
+            "type": "object",
+            "properties": { "a": { "type": "string" } },
+            "allOf": [{ "properties": { "a": { "type": "integer" } } }]
+        },
+        "tests": [
+            { "description": "refused", "data": { "a": "x" }, "valid": false, "failures": [] }
+        ]
+    },
+    {
+        "description": "allOf meets an integer and a number of one field: a whole number",
+        "schema": {
+            "type": "object",
+            "properties": { "n": { "type": "number" } },
+            "allOf": [{ "properties": { "n": { "type": "integer" } } }]
+        },
+        "tests": [
+            { "description": "whole", "data": { "n": 1 }, "valid": true, "failures": [] },
+            { "description": "fractional", "data": { "n": 1.5 }, "valid": false, "failures": ["Value.n: range"] }
+        ]
+    },
+    {
+        "description": "allOf narrows an integer to the narrower width its subschema states",
+        "schema": {
+            "type": "object",
+            "properties": { "n": { "type": "integer", "format": "int8", "allOf": [{ "type": "integer", "format": "int16" }] } }
+        },
+        "tests": [
+            { "description": "in int8", "data": { "n": 127 }, "valid": true, "failures": [] },
+            { "description": "past int8", "data": { "n": 128 }, "valid": false, "failures": ["Value.n: range"] }
+        ]
+    },
+    {
+        "description": "allOf refuses widths no one width holds",
+        "schema": {
+            "type": "object",
+            "properties": { "n": { "type": "integer", "format": "int8", "allOf": [{ "type": "integer", "format": "uint8" }] } }
+        },
+        "tests": [
+            { "description": "refused", "data": { "n": 1 }, "valid": true, "failures": [] }
+        ]
+    },
+    {
+        "description": "allOf of false makes a field's every value invalid",
+        "schema": {
+            "type": "object",
+            "properties": { "n": { "type": "integer", "allOf": [false] } }
+        },
+        "tests": [
+            { "description": "any value", "data": { "n": 1 }, "valid": false, "failures": ["Value.n: range"] }
+        ]
+    },
+    {
+        "description": "allOf takes a subschema that is a reference",
+        "schema": {
+            "$defs": { "Pos": { "type": "integer", "minimum": 0 } },
+            "type": "object",
+            "properties": { "n": { "type": "integer", "allOf": [{ "$ref": "#/$defs/Pos" }] } }
+        },
+        "tests": [
+            { "description": "non-negative", "data": { "n": 4 }, "valid": true, "failures": [] },
+            { "description": "negative", "data": { "n": -1 }, "valid": false, "failures": ["Value.n: range"] }
+        ]
+    },
+    {
+        "description": "allOf refuses units that disagree",
+        "schema": {
+            "type": "object",
+            "properties": { "t": { "type": "number", "unit": "Cel", "allOf": [{ "unit": "K" }] } }
+        },
+        "tests": [
+            { "description": "refused", "data": { "t": 1 }, "valid": true, "failures": [] }
+        ]
+    },
+    {
+        "description": "allOf refuses an object property both subschemas name",
+        "schema": {
+            "type": "object",
+            "properties": { "o": { "type": "object", "properties": { "x": { "type": "integer" } } } },
+            "allOf": [{ "properties": { "o": { "type": "object", "properties": { "y": { "type": "integer" } } } } }]
+        },
+        "tests": [
+            { "description": "refused", "data": { "o": { "x": 1 } }, "valid": true, "failures": [] }
+        ]
+    },
+    {
+        "description": "a field with no type takes its base from an allOf subschema",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "o": {
+                    "properties": { "b": { "type": "string" } },
+                    "allOf": [{ "type": "object", "properties": { "a": { "type": "integer" } }, "required": ["a"] }]
+                }
+            }
+        },
+        "tests": [
+            { "description": "both fields", "data": { "o": { "a": 1, "b": "x" } }, "valid": true, "failures": [] },
+            { "description": "required field absent", "data": { "o": { "b": "x" } }, "valid": false, "failures": ["Value.o.a: absent"] }
+        ]
+    },
+    {
+        "description": "allOf refuses a subschema of another kind than its parent",
+        "schema": {
+            "type": "object",
+            "properties": { "n": { "type": "integer", "allOf": [{ "type": "string" }] } }
+        },
+        "tests": [
+            { "description": "refused", "data": { "n": 1 }, "valid": true, "failures": [] }
+        ]
+    },
+    {
+        "description": "an enum of strings with no type takes the string type",
+        "schema": { "type": "object", "properties": { "k": { "enum": ["a", "b"] } } },
+        "tests": [
+            { "description": "a member", "data": { "k": "a" }, "valid": true, "failures": [] },
+            { "description": "not a member", "data": { "k": "z" }, "valid": false, "failures": ["Value.k: range"] }
+        ]
+    },
+    {
+        "description": "a const of a boolean with no type takes the boolean type",
+        "schema": { "type": "object", "properties": { "k": { "const": true } } },
+        "tests": [
+            { "description": "the member", "data": { "k": true }, "valid": true, "failures": [] },
+            { "description": "the other boolean", "data": { "k": false }, "valid": false, "failures": ["Value.k: range"] }
+        ]
+    },
+    {
+        "description": "an enum of integers and floats with no type takes the number type",
+        "schema": { "type": "object", "properties": { "k": { "enum": [1, 2.5] } } },
+        "tests": [
+            { "description": "an integer member", "data": { "k": 1 }, "valid": true, "failures": [] },
+            { "description": "a float member", "data": { "k": 2.5 }, "valid": true, "failures": [] },
+            { "description": "not a member", "data": { "k": 3 }, "valid": false, "failures": ["Value.k: range"] }
+        ]
+    },
+    {
+        "description": "an enum with null among its strings is a nullable string",
+        "schema": { "type": "object", "properties": { "k": { "enum": ["a", null] } } },
+        "tests": [
+            { "description": "a member", "data": { "k": "a" }, "valid": true, "failures": [] },
+            { "description": "null", "data": { "k": null }, "valid": true, "failures": [] },
+            { "description": "not a member", "data": { "k": "b" }, "valid": false, "failures": ["Value.k: range"] }
+        ]
+    },
+    {
+        "description": "allOf of subschemas that only list choices takes their kind",
+        "schema": { "type": "object", "properties": { "k": { "allOf": [{ "enum": ["a", "b"] }, { "enum": ["b", "c"] }] } } },
+        "tests": [
+            { "description": "in both", "data": { "k": "b" }, "valid": true, "failures": [] },
+            { "description": "in one", "data": { "k": "a" }, "valid": false, "failures": ["Value.k: range"] }
+        ]
+    }
+]

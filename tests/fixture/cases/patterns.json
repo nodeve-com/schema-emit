@@ -1,0 +1,19 @@
+[
+    {
+        "description": "pattern reads ECMA-262",
+        "schema": {
+            "type": "object",
+            "required": ["code"],
+            "properties": {
+                "code": { "type": "string", "pattern": "^\\S+.$" }
+            }
+        },
+        "tests": [
+            { "description": "a code with a final letter", "data": { "code": "ab1" }, "valid": true },
+            { "description": "a space inside", "data": { "code": "a b1" }, "valid": false, "failures": ["Value.code: range"] },
+            { "description": "a no-break space inside", "data": { "code": "a b1" }, "valid": false, "failures": ["Value.code: range"] },
+            { "description": "a line separator ends the dot", "data": { "code": "ab " }, "valid": false, "failures": ["Value.code: range"] },
+            { "description": "a final newline is not an anchor", "data": { "code": "ab\n" }, "valid": false, "failures": ["Value.code: range"] }
+        ]
+    }
+]

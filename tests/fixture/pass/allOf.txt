@@ -1,0 +1,21 @@
+allOf combined with anyOf, oneOf/allOf: false, anyOf: false, oneOf: false
+allOf combined with anyOf, oneOf/allOf: false, anyOf: false, oneOf: true
+allOf combined with anyOf, oneOf/allOf: false, anyOf: true, oneOf: false
+allOf combined with anyOf, oneOf/allOf: false, anyOf: true, oneOf: true
+allOf combined with anyOf, oneOf/allOf: true, anyOf: false, oneOf: false
+allOf combined with anyOf, oneOf/allOf: true, anyOf: false, oneOf: true
+allOf combined with anyOf, oneOf/allOf: true, anyOf: true, oneOf: false
+allOf combined with anyOf, oneOf/allOf: true, anyOf: true, oneOf: true
+allOf simple types/mismatch one
+allOf simple types/valid
+allOf with base schema/valid
+allOf with boolean schemas, all false/any value is invalid
+allOf with boolean schemas, all true/any value is valid
+allOf with boolean schemas, some false/any value is invalid
+allOf with one empty schema/any data is valid
+allOf with the first empty schema/number is valid
+allOf with the last empty schema/number is valid
+allOf with two empty schemas/any data is valid
+allOf/allOf
+allOf/wrong type
+nested allOf, to check validation semantics/null is valid

@@ -1,0 +1,20 @@
+object properties validation/both properties invalid is invalid
+object properties validation/both properties present and valid is valid
+object properties validation/doesn't invalidate other properties
+object properties validation/ignores arrays
+object properties validation/ignores other non-objects
+object properties validation/one property invalid is invalid
+properties whose names are Javascript object property names/__proto__ not valid
+properties whose names are Javascript object property names/all present and valid
+properties whose names are Javascript object property names/constructor not valid
+properties whose names are Javascript object property names/ignores arrays
+properties whose names are Javascript object property names/ignores other non-objects
+properties whose names are Javascript object property names/none of the properties mentioned
+properties whose names are Javascript object property names/toString not valid
+properties with boolean schema/both properties present is invalid
+properties with boolean schema/no property present is valid
+properties with boolean schema/only 'false' property present is invalid
+properties with boolean schema/only 'true' property present is valid
+properties with escaped characters/object with all numbers is valid
+properties with escaped characters/object with strings is invalid
+properties with null valued instance properties/allows null values

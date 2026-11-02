@@ -1,0 +1,6 @@
+minItems validation with a decimal/longer is valid
+minItems validation with a decimal/too short is invalid
+minItems validation/exact length is valid
+minItems validation/ignores non-arrays
+minItems validation/longer is valid
+minItems validation/too short is invalid

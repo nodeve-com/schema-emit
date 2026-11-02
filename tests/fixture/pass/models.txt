@@ -1,0 +1,17 @@
+a closed model's dependent fields, one naming no field/a alone
+a closed model's dependent fields, one naming no field/a with b and c, still naming a field no model holds
+a closed model's dependent fields, one naming no field/b alone names a field no model holds
+a closed model's dependent fields, one naming no field/c alone
+a closed model's dependent fields, one naming no field/neither
+a closed root's count of fields and its dependent field/a alone, its dependent absent
+a closed root's count of fields and its dependent field/b and c
+a closed root's count of fields and its dependent field/none, under the minimum
+a closed root's count of fields and its dependent field/three fields, over the maximum
+a closed root's count of fields and its dependent field/two fields, one requiring the other
+a computed comfort/in range
+a decoded reading of nested climate, its scalars shared/humidity past its bound
+a decoded reading of nested climate, its scalars shared/in range
+a list of days, each a shared model, a field narrowing its shared type/an item's field failing
+a list of days, each a shared model, a field narrowing its shared type/in range
+a list of days, each a shared model, a field narrowing its shared type/the narrowed bound
+a model of one 64-bit count/a count

@@ -1,0 +1,4 @@
+exclusiveMinimum validation/above the exclusiveMinimum is valid
+exclusiveMinimum validation/below the exclusiveMinimum is invalid
+exclusiveMinimum validation/boundary point is invalid
+exclusiveMinimum validation/ignores non-numbers

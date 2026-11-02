@@ -1,0 +1,146 @@
+[
+    {
+        "description": "a chain of objects, each referring to the whole schema",
+        "schema": {
+            "type": "object",
+            "required": ["n"],
+            "properties": {
+                "n": { "type": "integer", "minimum": 0, "maximum": 9 },
+                "next": { "$ref": "#" }
+            },
+            "additionalProperties": false
+        },
+        "tests": [
+            { "description": "one object", "data": { "n": 1 }, "valid": true, "failures": [] },
+            { "description": "three objects", "data": { "n": 1, "next": { "n": 2, "next": { "n": 3 } } }, "valid": true, "failures": [] },
+            { "description": "the last object out of range", "data": { "n": 1, "next": { "n": 2, "next": { "n": 30 } } }, "valid": false, "failures": ["Value.next.next.n: range"] },
+            { "description": "the second object lacks its number", "data": { "n": 1, "next": {} }, "valid": false, "failures": ["Value.next.n: absent"] }
+        ]
+    },
+    {
+        "description": "a tree through a list, by anchor",
+        "schema": {
+            "$defs": {
+                "node": {
+                    "$anchor": "node",
+                    "type": "object",
+                    "required": ["leaf"],
+                    "properties": {
+                        "leaf": { "type": "boolean" },
+                        "children": { "type": "array", "items": { "$ref": "#node" } }
+                    }
+                }
+            },
+            "type": "object",
+            "properties": { "root": { "$ref": "#node" } }
+        },
+        "tests": [
+            { "description": "a leaf", "data": { "root": { "leaf": true } }, "valid": true, "failures": [] },
+            { "description": "two levels", "data": { "root": { "leaf": false, "children": [{ "leaf": true }, { "leaf": true, "children": [] }] } }, "valid": true, "failures": [] },
+            { "description": "a child lacking its flag", "data": { "root": { "leaf": false, "children": [{ "leaf": true }, {}] } }, "valid": false, "failures": ["Value.root.children[1].leaf: absent"] },
+            { "description": "a flag lacking past the indices a failure keeps", "data": { "root": { "leaf": false, "children": [{ "leaf": true }, { "leaf": false, "children": [{ "leaf": true }, { "leaf": false, "children": [{ "leaf": true }, { "leaf": false, "children": [{ "leaf": true }, { "leaf": false, "children": [{ "leaf": true }, {}] } ] } ] } ] } ] } }, "valid": false, "failures": ["Value.root.children[1].children[1].children[1].children[0].children[0].leaf: absent"] }
+        ]
+    },
+    {
+        "description": "pointers escape slashes, tildes, and percent signs",
+        "schema": {
+            "$defs": {
+                "a/b": { "type": "integer", "maximum": 5 },
+                "c~d": { "type": "integer", "maximum": 6 },
+                "e%f": { "type": "integer", "maximum": 7 }
+            },
+            "type": "object",
+            "properties": {
+                "slash": { "$ref": "#/$defs/a~1b" },
+                "tilde": { "$ref": "#/$defs/c~0d" },
+                "percent": { "$ref": "#/$defs/e%25f" },
+                "encoded": { "$ref": "#/$defs/a%7E1b" }
+            }
+        },
+        "tests": [
+            { "description": "all within", "data": { "slash": 5, "tilde": 6, "percent": 7, "encoded": 5 }, "valid": true, "failures": [] },
+            { "description": "each past its bound", "data": { "slash": 6, "tilde": 7, "percent": 8, "encoded": 6 }, "valid": false, "failures": ["Value.slash: range", "Value.tilde: range", "Value.percent: range", "Value.encoded: range"] }
+        ]
+    },
+    {
+        "description": "an id resolves a relative reference, a pointer reaches into properties",
+        "schema": {
+            "$id": "http://example.test/root/schema.json",
+            "type": "object",
+            "properties": {
+                "small": { "type": "integer", "maximum": 3 },
+                "same": { "$ref": "#/properties/small" },
+                "other": { "$ref": "sub/item.json" }
+            },
+            "$defs": {
+                "item": { "$id": "sub/item.json", "type": "integer", "minimum": 10 }
+            }
+        },
+        "tests": [
+            { "description": "within", "data": { "small": 3, "same": 2, "other": 10 }, "valid": true, "failures": [] },
+            { "description": "outside", "data": { "small": 4, "same": 4, "other": 9 }, "valid": false, "failures": ["Value.small: range", "Value.same: range", "Value.other: range"] }
+        ]
+    },
+    {
+        "description": "a tree reaching itself by two steps",
+        "schema": {
+            "type": "object",
+            "required": ["n"],
+            "properties": {
+                "n": { "type": "integer", "maximum": 9 },
+                "left": { "$ref": "#" },
+                "right": { "$ref": "#" }
+            }
+        },
+        "tests": [
+            { "description": "both sides", "data": { "n": 1, "left": { "n": 2 }, "right": { "n": 3 } }, "valid": true, "failures": [] },
+            { "description": "one side out of range", "data": { "n": 1, "left": { "n": 2 }, "right": { "n": 30 } }, "valid": false, "failures": ["Value.right.n: range"] },
+            { "description": "left, then right, then out of range", "data": { "n": 1, "left": { "n": 2, "right": { "n": 30 } } }, "valid": false, "failures": ["Value.left.right.n: range"] },
+            { "description": "right five deep, past the indices a failure keeps", "data": { "n": 1, "right": { "n": 1, "right": { "n": 1, "right": { "n": 1, "right": { "n": 1, "right": { "n": 30 } } } } } }, "valid": false, "failures": ["Value.right.right.right.right.left.n: range"] }
+        ]
+    },
+    {
+        "description": "a list step beside a field step",
+        "schema": {
+            "type": "object",
+            "required": ["n"],
+            "properties": {
+                "n": { "type": "integer", "maximum": 9 },
+                "kids": { "type": "array", "items": { "$ref": "#" } },
+                "next": { "$ref": "#" }
+            }
+        },
+        "tests": [
+            { "description": "both steps", "data": { "n": 1, "kids": [{ "n": 2 }], "next": { "n": 3 } }, "valid": true, "failures": [] },
+            { "description": "a kid out of range", "data": { "n": 1, "kids": [{ "n": 2 }, { "n": 30 }] }, "valid": false, "failures": ["Value.kids[1].n: range"] },
+            { "description": "a kid, then next, then a kid past the indices a failure keeps lacking its number", "data": { "n": 1, "kids": [{ "n": 2 }, { "n": 2, "next": { "n": 3, "kids": [{ "n": 4 }, {}] } }] }, "valid": false, "failures": ["Value.kids[1].next.kids[0].n: absent"] }
+        ]
+    },
+    {
+        "description": "a field of the metaschema, holding an object",
+        "schema": {
+            "type": "object",
+            "required": ["schema"],
+            "properties": { "schema": { "$ref": "https://json-schema.org/draft/2020-12/schema" } }
+        },
+        "tests": [
+            { "description": "an object", "data": { "schema": { "type": "string", "minLength": 1 } }, "valid": true, "failures": [] },
+            { "description": "a boolean", "data": { "schema": true }, "valid": true, "failures": [] },
+            { "description": "absent", "data": {}, "valid": false, "failures": ["Value.schema: absent"] }
+        ]
+    },
+    {
+        "description": "a field of annotations only, holding any kind",
+        "schema": {
+            "type": "object",
+            "required": ["v"],
+            "properties": { "v": { "title": "anything", "description": "no check", "default": 1, "$comment": "note" } }
+        },
+        "tests": [
+            { "description": "a number", "data": { "v": 1.5 }, "valid": true, "failures": [] },
+            { "description": "a string", "data": { "v": "x" }, "valid": true, "failures": [] },
+            { "description": "an object", "data": { "v": { "a": [1, null, "b"] } }, "valid": true, "failures": [] },
+            { "description": "absent", "data": {}, "valid": false, "failures": ["Value.v: absent"] }
+        ]
+    }
+]

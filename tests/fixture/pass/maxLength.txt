@@ -1,0 +1,7 @@
+maxLength validation with a decimal/shorter is valid
+maxLength validation with a decimal/too long is invalid
+maxLength validation/exact length is valid
+maxLength validation/ignores non-strings
+maxLength validation/shorter is valid
+maxLength validation/too long is invalid
+maxLength validation/two graphemes is long enough

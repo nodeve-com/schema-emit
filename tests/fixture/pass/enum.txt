@@ -1,0 +1,48 @@
+characters with the same visual representation, but different number of codepoints/character looks the same but uses combining marks
+characters with the same visual representation, but different number of codepoints/character uses the same codepoint
+empty enum/array is invalid
+empty enum/boolean is invalid
+empty enum/null is invalid
+empty enum/number is invalid
+empty enum/object is invalid
+empty enum/string is invalid
+enum with 0 does not match false/false is invalid
+enum with 0 does not match false/float zero is valid
+enum with 0 does not match false/integer zero is valid
+enum with 1 does not match true/float one is valid
+enum with 1 does not match true/integer one is valid
+enum with 1 does not match true/true is invalid
+enum with [0] does not match [false]/[0.0] is valid
+enum with [0] does not match [false]/[0] is valid
+enum with [0] does not match [false]/[false] is invalid
+enum with [1] does not match [true]/[1.0] is valid
+enum with [1] does not match [true]/[1] is valid
+enum with [1] does not match [true]/[true] is invalid
+enum with [false] does not match [0]/[0.0] is invalid
+enum with [false] does not match [0]/[0] is invalid
+enum with [false] does not match [0]/[false] is valid
+enum with [true] does not match [1]/[1.0] is invalid
+enum with [true] does not match [1]/[1] is invalid
+enum with [true] does not match [1]/[true] is valid
+enum with escaped characters/another string is invalid
+enum with escaped characters/member 1 is valid
+enum with escaped characters/member 2 is valid
+enum with false does not match 0/false is valid
+enum with false does not match 0/float zero is invalid
+enum with false does not match 0/integer zero is invalid
+enum with true does not match 1/float one is invalid
+enum with true does not match 1/integer one is invalid
+enum with true does not match 1/true is valid
+enums in properties/both properties are valid
+enums in properties/missing optional property is valid
+enums in properties/wrong bar value
+enums in properties/wrong foo value
+heterogeneous enum validation/one of the enum is valid
+heterogeneous enum validation/something else is invalid
+heterogeneous enum-with-null validation/null is valid
+heterogeneous enum-with-null validation/number is valid
+heterogeneous enum-with-null validation/something else is invalid
+nul characters in strings/do not match string lacking nul
+nul characters in strings/match string with nul
+simple enum validation/one of the enum is valid
+simple enum validation/something else is invalid

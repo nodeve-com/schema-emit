@@ -1,0 +1,20 @@
+contains keyword validation/array with item matching schema (5) is valid
+contains keyword validation/array with item matching schema (6) is valid
+contains keyword validation/array with two items matching schema (5, 6) is valid
+contains keyword validation/array without items matching schema is invalid
+contains keyword validation/empty array is invalid
+contains keyword validation/not array is valid
+contains keyword with boolean schema false/any non-empty array is invalid
+contains keyword with boolean schema false/empty array is invalid
+contains keyword with boolean schema false/non-arrays are valid
+contains keyword with boolean schema true/any non-empty array is valid
+contains keyword with boolean schema true/empty array is invalid
+contains keyword with const keyword/array with item 5 is valid
+contains keyword with const keyword/array with two items 5 is valid
+contains keyword with const keyword/array without item 5 is invalid
+contains with false if subschema/any non-empty array is valid
+contains with false if subschema/empty array is invalid
+items + contains/does not match items, matches contains
+items + contains/matches both items and contains
+items + contains/matches items, does not match contains
+items + contains/matches neither items nor contains

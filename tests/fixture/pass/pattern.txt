@@ -1,0 +1,9 @@
+pattern is not anchored/matches a substring
+pattern validation/a matching pattern is valid
+pattern validation/a non-matching pattern is invalid
+pattern validation/ignores arrays
+pattern validation/ignores booleans
+pattern validation/ignores floats
+pattern validation/ignores integers
+pattern validation/ignores null
+pattern validation/ignores objects

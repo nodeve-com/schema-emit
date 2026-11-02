@@ -1,0 +1,30 @@
+else: false fails when condition does not match/does not match if → else executes → invalid
+else: false fails when condition does not match/matches if → else ignored → valid
+if and else without then/invalid through else
+if and else without then/valid through else
+if and else without then/valid when if test passes
+if and then without else/invalid through then
+if and then without else/valid through then
+if and then without else/valid when if test fails
+if appears at the end when serialized (keyword processing sequence)/invalid redirects to else and fails
+if appears at the end when serialized (keyword processing sequence)/no redirects to then and fails
+if appears at the end when serialized (keyword processing sequence)/other redirects to else and passes
+if appears at the end when serialized (keyword processing sequence)/yes redirects to then and passes
+if with boolean schema false/boolean schema false in if always chooses the else path (invalid)
+if with boolean schema false/boolean schema false in if always chooses the else path (valid)
+if with boolean schema true/boolean schema true in if always chooses the then path (invalid)
+if with boolean schema true/boolean schema true in if always chooses the then path (valid)
+ignore else without if/valid when invalid against lone else
+ignore else without if/valid when valid against lone else
+ignore if without then or else/valid when invalid against lone if
+ignore if without then or else/valid when valid against lone if
+ignore then without if/valid when invalid against lone then
+ignore then without if/valid when valid against lone then
+non-interference across combined schemas/valid, but would have been invalid through else
+non-interference across combined schemas/valid, but would have been invalid through then
+then: false fails when condition matches/does not match if → then ignored → valid
+then: false fails when condition matches/matches if → then=false → invalid
+validate against correct branch, then vs else/invalid through else
+validate against correct branch, then vs else/invalid through then
+validate against correct branch, then vs else/valid through else
+validate against correct branch, then vs else/valid through then

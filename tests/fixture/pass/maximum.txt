@@ -1,0 +1,8 @@
+maximum validation with unsigned integer/above the maximum is invalid
+maximum validation with unsigned integer/below the maximum is valid
+maximum validation with unsigned integer/boundary point float is valid
+maximum validation with unsigned integer/boundary point integer is valid
+maximum validation/above the maximum is invalid
+maximum validation/below the maximum is valid
+maximum validation/boundary point is valid
+maximum validation/ignores non-numbers

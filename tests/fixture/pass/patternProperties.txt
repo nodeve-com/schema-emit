@@ -1,0 +1,19 @@
+multiple simultaneous patternProperties are validated/a simultaneous match is valid
+multiple simultaneous patternProperties are validated/a single valid match is valid
+multiple simultaneous patternProperties are validated/an invalid due to one is invalid
+multiple simultaneous patternProperties are validated/an invalid due to the other is invalid
+multiple simultaneous patternProperties are validated/multiple matches is valid
+patternProperties validates properties matching a regex/a single valid match is valid
+patternProperties validates properties matching a regex/ignores arrays
+patternProperties validates properties matching a regex/ignores other non-objects
+patternProperties validates properties matching a regex/ignores strings
+patternProperties validates properties matching a regex/multiple invalid matches is invalid
+patternProperties validates properties matching a regex/multiple valid matches is valid
+patternProperties with boolean schemas/empty object is valid
+patternProperties with boolean schemas/object with a property matching both true and false is invalid
+patternProperties with boolean schemas/object with both properties is invalid
+patternProperties with boolean schemas/object with property matching schema false is invalid
+patternProperties with boolean schemas/object with property matching schema true is valid
+patternProperties with null valued instance properties/allows null values
+regexes are not anchored by default and are case sensitive/recognized members are accounted for
+regexes are not anchored by default and are case sensitive/regexes are case sensitive, 2

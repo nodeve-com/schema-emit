@@ -1,0 +1,18 @@
+allow everything with boolean schema false/boolean false is valid
+allow everything with boolean schema false/boolean true is valid
+allow everything with boolean schema false/number is valid
+allow everything with boolean schema false/string is valid
+double negation/any value is valid
+forbid everything with boolean schema true/boolean false is invalid
+forbid everything with boolean schema true/boolean true is invalid
+forbid everything with boolean schema true/number is invalid
+forbid everything with boolean schema true/string is invalid
+forbid everything with empty schema/boolean false is invalid
+forbid everything with empty schema/boolean true is invalid
+forbid everything with empty schema/number is invalid
+forbid everything with empty schema/string is invalid
+forbidden property/property absent
+forbidden property/property present
+not more complex schema/match
+not/allowed
+not/disallowed

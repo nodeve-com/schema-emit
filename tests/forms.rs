@@ -1,0 +1,144 @@
+//! The std form's items as an embedder includes them: one struct or enum per definition, named by
+//! it, and a model another crate writes read through that crate's module.
+
+#![allow(clippy::unwrap_used)]
+
+use schema_emit::emit::std_form::{names, StdForm};
+use schema_emit::ir::Schema;
+use schema_emit::json_schema::lower;
+use serde_json::{json, Map};
+
+/// `s`'s std form, each struct named by [`names`].
+fn items(s: &Schema) -> String {
+    let names = names(s);
+    let name = |i: usize| names.get(i).cloned().unwrap_or_default();
+    StdForm::new(s, &name).items().unwrap()
+}
+
+/// The std form of `schema` as the root `Root`.
+fn rooted(schema: &serde_json::Value) -> String {
+    items(&lower("Root", schema, &Map::new(), &[]).unwrap().0)
+}
+
+/// A root naming the definition `Part` twice.
+fn schema() -> serde_json::Value {
+    json!({
+        "type": "object",
+        "required": ["a"],
+        "properties": {
+            "a": { "$ref": "#/$defs/Part" },
+            "b": { "type": "array", "items": { "$ref": "#/$defs/Part" } }
+        },
+        "$defs": {
+            "Part": { "type": "object", "properties": { "n": { "type": "integer" } } }
+        }
+    })
+}
+
+#[test]
+fn a_definition_named_twice_is_one_struct() {
+    let items = rooted(&schema());
+    assert_eq!(items.matches("pub struct Part ").count(), 1, "{items}");
+    assert!(items.contains("pub b: Option<Vec<Part>>"), "{items}");
+}
+
+#[test]
+fn an_external_model_is_read_through_its_module() {
+    let (s, _) = lower("Root", &schema(), &Map::new(), &[]).unwrap();
+    let names = names(&s);
+    let name = |i: usize| names.get(i).cloned().unwrap_or_default();
+    let external = |i: usize| (name(i) == "Part").then(|| "::other".to_string());
+    let items = StdForm::new(&s, &name)
+        .with_external(&external)
+        .items()
+        .unwrap();
+    assert!(!items.contains("pub struct Part "), "{items}");
+    assert!(!items.contains("fn read_part("), "{items}");
+    assert!(items.contains("pub a: ::other::Part"), "{items}");
+    assert!(items.contains("::other::read_part("), "{items}");
+}
+
+#[test]
+fn each_definition_lowers_once_by_name() {
+    let (s, defs) = schema_emit::json_schema::lower_defs(&schema(), &Map::new(), &[]).unwrap();
+    let got: Vec<&str> = defs.iter().map(|(n, _)| n.as_str()).collect();
+    assert_eq!(got, ["Part"]);
+    assert_eq!(s.models.len(), 1);
+}
+
+#[test]
+fn an_allof_over_a_definition_leaves_the_definition_as_it_is() {
+    let schema = json!({
+        "$defs": {
+            "Fields": { "type": "object", "required": ["kind"], "properties": { "kind": { "type": "string" } } },
+            "Plain": { "allOf": [{ "$ref": "#/$defs/Fields" }], "unevaluatedProperties": false },
+            "Named": {
+                "allOf": [{ "$ref": "#/$defs/Fields" }],
+                "required": ["id"],
+                "properties": { "id": { "type": "string" } },
+                "unevaluatedProperties": false
+            }
+        }
+    });
+    let (s, _) = schema_emit::json_schema::lower_defs(&schema, &Map::new(), &[]).unwrap();
+    let items = items(&s);
+    assert!(
+        items.contains("pub struct Fields { pub kind: String, }"),
+        "{items}"
+    );
+    assert!(
+        items.contains("pub struct Plain { pub kind: String, }"),
+        "{items}"
+    );
+    assert!(
+        items.contains("pub struct Named { pub kind: String, pub id: String, }"),
+        "{items}"
+    );
+}
+
+#[test]
+fn a_union_takes_the_definition_naming_it() {
+    let schema = json!({
+        "type": "object",
+        "required": ["a", "b", "c"],
+        "properties": {
+            "a": { "$ref": "#/$defs/Pick" },
+            "b": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
+            "c": { "$ref": "#/$defs/Part" }
+        },
+        "$defs": {
+            "Pick": { "anyOf": [{ "$ref": "#/$defs/Part" }, { "type": "string" }] },
+            "Part": { "anyOf": [{ "type": "boolean" }, { "type": "string" }] }
+        }
+    });
+    let items = rooted(&schema);
+    assert!(
+        items.contains("pub enum Pick { Part(Part), String(String), }"),
+        "{items}"
+    );
+    assert!(
+        items.contains("pub enum Part { Bool(bool), String(String), }"),
+        "{items}"
+    );
+    assert!(items.contains("pub enum StringOrI64 "), "{items}");
+    assert!(
+        items.contains("pub a: Pick, pub b: StringOrI64, pub c: Part,"),
+        "{items}"
+    );
+    assert!(items.contains("fn read_pick("), "{items}");
+}
+
+#[test]
+fn a_union_named_as_a_model_keeps_its_branches_name() {
+    let schema = json!({
+        "type": "object",
+        "required": ["root"],
+        "properties": { "root": { "$ref": "#/$defs/Root" } },
+        "$defs": { "Root": { "anyOf": [{ "type": "boolean" }, { "type": "string" }] } }
+    });
+    let items = rooted(&schema);
+    assert!(
+        items.contains("pub struct Root { pub root: BoolOrString, }"),
+        "{items}"
+    );
+}

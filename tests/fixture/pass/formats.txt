@@ -1,0 +1,20 @@
+a duration by format human-duration/ISO 8601
+a duration by format human-duration/seconds as CEL writes them
+a duration by format duration/ISO 8601
+a duration by format duration/a unit without a number
+a duration by format duration/seconds as CEL writes them
+a timestamp by format date-time/a date alone
+a timestamp by format date-time/an RFC 3339 instant
+a timestamp by format date-time/with an offset and a fraction
+bytes by contentEncoding base64/a character outside the alphabet
+bytes by contentEncoding base64/padded standard base64
+bytes by contentEncoding base64/padding missing
+bytes by contentEncoding base64/the empty string
+other content encodings stay text/any text
+other text formats stay annotations/not an email
+uniqueItems of bytes/one byte string twice
+uniqueItems of bytes/two byte strings
+uniqueItems of durations/one span twice
+uniqueItems of durations/two spans
+uniqueItems of timestamps/one instant twice
+uniqueItems of timestamps/two instants

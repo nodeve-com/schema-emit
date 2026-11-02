@@ -1,0 +1,25 @@
+a const of a boolean with no type takes the boolean type/the member
+a const of a boolean with no type takes the boolean type/the other boolean
+a field with no type takes its base from an allOf subschema/both fields
+allOf meets an integer and a number of one field: a whole number/fractional
+allOf meets an integer and a number of one field: a whole number/whole
+allOf merges fields by name, and a field's checks from each subschema apply/in every range
+allOf merges fields by name, and a field's checks from each subschema apply/past the first subschema's bound
+allOf narrows an integer to the narrower width its subschema states/in int8
+allOf narrows an integer to the narrower width its subschema states/past int8
+allOf of false makes a field's every value invalid/any value
+allOf of subschemas that only list choices takes their kind/in both
+allOf of subschemas that only list choices takes their kind/in one
+allOf refuses units that disagree/refused
+allOf takes a subschema that is a reference/negative
+allOf takes a subschema that is a reference/non-negative
+allOf with a closed subschema naming every field merges/a negative field
+allOf with a closed subschema naming every field merges/a valid field
+an enum of integers and floats with no type takes the number type/a float member
+an enum of integers and floats with no type takes the number type/an integer member
+an enum of integers and floats with no type takes the number type/not a member
+an enum of strings with no type takes the string type/a member
+an enum of strings with no type takes the string type/not a member
+an enum with null among its strings is a nullable string/a member
+an enum with null among its strings is a nullable string/not a member
+an enum with null among its strings is a nullable string/null

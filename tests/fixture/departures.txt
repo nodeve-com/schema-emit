@@ -1,0 +1,7 @@
+format/date-time format/invalid date-time string is only an annotation by default	format is asserted
+format/duration format/invalid duration string is only an annotation by default	format is asserted
+content/validation of binary string-encoding/an invalid base64 string (% is not a valid character); validates true	contentEncoding base64 is asserted
+content/validation of binary-encoded media type documents/an invalid base64 string that is valid JSON; validates true	contentEncoding base64 is asserted
+content/validation of binary-encoded media type documents with schema/an invalid base64 string that is valid JSON; validates true	contentEncoding base64 is asserted
+defs/validate definition against metaschema/invalid definition schema	the 2020-12 metaschema lowers to any value: lowering a schema checks it
+ref/remote ref, containing refs itself/remote ref invalid	the 2020-12 metaschema lowers to any value: lowering a schema checks it

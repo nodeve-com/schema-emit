@@ -1,0 +1,20 @@
+dependencies with escaped characters/CRLF
+dependencies with escaped characters/CRLF missing dependent
+dependencies with escaped characters/quoted quotes
+dependencies with escaped characters/quoted quotes missing dependent
+empty dependents/empty object
+empty dependents/non-object is valid
+empty dependents/object with one property
+multiple dependents required/missing both dependencies
+multiple dependents required/missing dependency
+multiple dependents required/missing other dependency
+multiple dependents required/neither
+multiple dependents required/nondependants
+multiple dependents required/with dependencies
+single dependency/ignores arrays
+single dependency/ignores other non-objects
+single dependency/ignores strings
+single dependency/missing dependency
+single dependency/neither
+single dependency/nondependant
+single dependency/with dependency

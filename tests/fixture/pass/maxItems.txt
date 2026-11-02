@@ -1,0 +1,6 @@
+maxItems validation with a decimal/shorter is valid
+maxItems validation with a decimal/too long is invalid
+maxItems validation/exact length is valid
+maxItems validation/ignores non-arrays
+maxItems validation/shorter is valid
+maxItems validation/too long is invalid

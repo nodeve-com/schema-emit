@@ -1,0 +1,41 @@
+a width and bounds together/inside both
+a width and bounds together/the width binds above
+a width and bounds together/the width binds below
+double/an integer
+double/large
+float/an integer
+float/just past greatest
+float/near greatest
+float/past the width
+float/past the width, negative
+float/small
+fractional bounds on an integer round inward/at the exclusive maximum
+fractional bounds on an integer round inward/below the exclusive maximum
+fractional bounds on an integer round inward/below the rounded minimum
+fractional bounds on an integer round inward/the rounded minimum
+int16/least
+int16/one past greatest
+int32/least
+int32/one past greatest
+int32/one past least
+int64/greatest
+int64/least
+int8/greatest
+int8/least
+int8/one past greatest
+int8/one past least
+int8/whole float
+integer without a format is int64/greatest
+integer without a format is int64/least
+uint16/greatest
+uint16/one past greatest
+uint32/greatest
+uint32/negative
+uint32/one past greatest
+uint64/greatest
+uint64/past i64
+uint64/zero
+uint8/greatest
+uint8/negative
+uint8/one past greatest
+uint8/zero

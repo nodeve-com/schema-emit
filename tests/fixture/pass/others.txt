@@ -1,0 +1,14 @@
+a map of one type/a value past its bound
+a map of one type/values in range
+a reading with fields and other keys of one type/an other key below its bound
+a reading with fields and other keys of one type/no other key
+a reading with fields and other keys of one type/other keys in range
+key names and a count on an open object/a long other name
+key names and a count on an open object/short names
+key names and a count on an open object/too few keys
+keys by pattern, the rest closed/a key by no pattern
+keys by pattern, the rest closed/a key by pattern
+keys by pattern, the rest closed/a key by pattern past its bound
+required and dependent keys no field names/both present
+required and dependent keys no field names/the dependent key absent
+required and dependent keys no field names/the required key absent

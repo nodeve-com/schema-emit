@@ -1,0 +1,7 @@
+boolean subschemas/empty object is valid
+boolean subschemas/object with both properties is invalid
+boolean subschemas/object with property having schema false is invalid
+boolean subschemas/object with property having schema true is valid
+single dependency/ignores arrays
+single dependency/ignores other non-objects
+single dependency/ignores strings

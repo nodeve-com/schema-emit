@@ -1,0 +1,121 @@
+[
+    {
+        "description": "int8",
+        "schema": { "type": "integer", "format": "int8" },
+        "tests": [
+            { "description": "least", "data": -128, "valid": true },
+            { "description": "greatest", "data": 127, "valid": true },
+            { "description": "one past greatest", "data": 128, "valid": false },
+            { "description": "one past least", "data": -129, "valid": false },
+            { "description": "whole float", "data": 1.0, "valid": true }
+        ]
+    },
+    {
+        "description": "uint8",
+        "schema": { "type": "integer", "format": "uint8" },
+        "tests": [
+            { "description": "zero", "data": 0, "valid": true },
+            { "description": "greatest", "data": 255, "valid": true },
+            { "description": "negative", "data": -1, "valid": false },
+            { "description": "one past greatest", "data": 256, "valid": false }
+        ]
+    },
+    {
+        "description": "int16",
+        "schema": { "type": "integer", "format": "int16" },
+        "tests": [
+            { "description": "least", "data": -32768, "valid": true },
+            { "description": "one past greatest", "data": 32768, "valid": false }
+        ]
+    },
+    {
+        "description": "uint16",
+        "schema": { "type": "integer", "format": "uint16" },
+        "tests": [
+            { "description": "greatest", "data": 65535, "valid": true },
+            { "description": "one past greatest", "data": 65536, "valid": false }
+        ]
+    },
+    {
+        "description": "int32",
+        "schema": { "type": "integer", "format": "int32" },
+        "tests": [
+            { "description": "least", "data": -2147483648, "valid": true },
+            { "description": "one past least", "data": -2147483649, "valid": false },
+            { "description": "one past greatest", "data": 2147483648, "valid": false }
+        ]
+    },
+    {
+        "description": "uint32",
+        "schema": { "type": "integer", "format": "uint32" },
+        "tests": [
+            { "description": "greatest", "data": 4294967295, "valid": true },
+            { "description": "one past greatest", "data": 4294967296, "valid": false },
+            { "description": "negative", "data": -1, "valid": false }
+        ]
+    },
+    {
+        "description": "int64",
+        "schema": { "type": "integer", "format": "int64" },
+        "tests": [
+            { "description": "least", "data": -9223372036854775808, "valid": true },
+            { "description": "greatest", "data": 9223372036854775807, "valid": true }
+        ]
+    },
+    {
+        "description": "uint64",
+        "schema": { "type": "integer", "format": "uint64" },
+        "tests": [
+            { "description": "greatest", "data": 18446744073709551615, "valid": true },
+            { "description": "past i64", "data": 9223372036854775808, "valid": true },
+            { "description": "zero", "data": 0, "valid": true }
+        ]
+    },
+    {
+        "description": "integer without a format is int64",
+        "schema": { "type": "integer" },
+        "tests": [
+            { "description": "greatest", "data": 9223372036854775807, "valid": true },
+            { "description": "least", "data": -9223372036854775808, "valid": true }
+        ]
+    },
+    {
+        "description": "float",
+        "schema": { "type": "number", "format": "float" },
+        "tests": [
+            { "description": "small", "data": 20.5, "valid": true },
+            { "description": "near greatest", "data": 3.4e38, "valid": true },
+            { "description": "just past greatest", "data": 3.41e38, "valid": false },
+            { "description": "past the width", "data": 1e300, "valid": false },
+            { "description": "past the width, negative", "data": -1e39, "valid": false },
+            { "description": "an integer", "data": 21, "valid": true }
+        ]
+    },
+    {
+        "description": "double",
+        "schema": { "type": "number", "format": "double" },
+        "tests": [
+            { "description": "large", "data": 1e300, "valid": true },
+            { "description": "an integer", "data": 21, "valid": true }
+        ]
+    },
+    {
+        "description": "a width and bounds together",
+        "schema": { "type": "integer", "format": "uint8", "minimum": -10, "maximum": 300 },
+        "tests": [
+            { "description": "the width binds above", "data": 256, "valid": false },
+            { "description": "the width binds below", "data": -1, "valid": false },
+            { "description": "inside both", "data": 200, "valid": true }
+        ]
+    },
+    {
+        "description": "fractional bounds on an integer round inward",
+        "schema": { "type": "integer", "minimum": 1.5, "exclusiveMaximum": 4.0 },
+        "tests": [
+            { "description": "below the rounded minimum", "data": 1, "valid": false },
+            { "description": "the rounded minimum", "data": 2, "valid": true },
+            { "description": "below the exclusive maximum", "data": 3, "valid": true },
+            { "description": "at the exclusive maximum", "data": 4, "valid": false }
+        ]
+    }
+]

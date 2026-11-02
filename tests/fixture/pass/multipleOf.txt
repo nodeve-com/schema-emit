@@ -1,0 +1,10 @@
+by int/ignores non-numbers
+by int/int by int
+by int/int by int fail
+by number/-4.5 is multiple of 1.5
+by number/35 is not multiple of 1.5
+by number/4.5 is multiple of 1.5
+by number/zero is multiple of anything
+by small number/0.0075 is multiple of 0.0001
+by small number/0.00751 is not multiple of 0.0001
+small multiple of large integer/any integer is a multiple of 1e-8

@@ -1,0 +1,11 @@
+a schema given for prefixItems/JavaScript pseudo-array is valid
+a schema given for prefixItems/array with additional items
+a schema given for prefixItems/correct types
+a schema given for prefixItems/empty array
+a schema given for prefixItems/incomplete array of items
+a schema given for prefixItems/wrong types
+additional items are allowed by default/only the first item is validated
+prefixItems with boolean schemas/array with one item is valid
+prefixItems with boolean schemas/array with two items is invalid
+prefixItems with boolean schemas/empty array is valid
+prefixItems with null instance elements/allows null elements

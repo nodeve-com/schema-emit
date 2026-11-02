@@ -1,0 +1,22 @@
+propertyNames validation with pattern/matching property names valid
+propertyNames validation with pattern/non-matching property name is invalid
+propertyNames validation with pattern/object without properties is valid
+propertyNames validation/all property names valid
+propertyNames validation/ignores arrays
+propertyNames validation/ignores booleans
+propertyNames validation/ignores null
+propertyNames validation/ignores other non-objects
+propertyNames validation/ignores strings
+propertyNames validation/object without properties is valid
+propertyNames validation/some property names invalid
+propertyNames with boolean schema false/empty object is valid
+propertyNames with boolean schema false/object with any properties is invalid
+propertyNames with boolean schema true/empty object is valid
+propertyNames with boolean schema true/object with any properties is valid
+propertyNames with const/empty object is valid
+propertyNames with const/object with any other property is invalid
+propertyNames with const/object with property foo is valid
+propertyNames with enum/empty object is valid
+propertyNames with enum/object with any other property is invalid
+propertyNames with enum/object with property foo and bar is valid
+propertyNames with enum/object with property foo is valid

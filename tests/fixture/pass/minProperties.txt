@@ -1,0 +1,10 @@
+minProperties validation with a decimal/longer is valid
+minProperties validation with a decimal/too short is invalid
+minProperties validation/exact length is valid
+minProperties validation/ignores arrays
+minProperties validation/ignores booleans
+minProperties validation/ignores null
+minProperties validation/ignores other non-objects
+minProperties validation/ignores strings
+minProperties validation/longer is valid
+minProperties validation/too short is invalid

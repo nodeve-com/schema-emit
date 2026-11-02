@@ -1,0 +1,7 @@
+minLength validation with a decimal/longer is valid
+minLength validation with a decimal/too short is invalid
+minLength validation/exact length is valid
+minLength validation/ignores non-strings
+minLength validation/longer is valid
+minLength validation/one grapheme is not long enough
+minLength validation/too short is invalid

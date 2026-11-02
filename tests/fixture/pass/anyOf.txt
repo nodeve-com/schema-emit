@@ -1,0 +1,14 @@
+anyOf with base schema/both anyOf invalid
+anyOf with base schema/mismatch base schema
+anyOf with base schema/one anyOf valid
+anyOf with boolean schemas, all false/any value is invalid
+anyOf with boolean schemas, all true/any value is valid
+anyOf with boolean schemas, some true/any value is valid
+anyOf with one empty schema/number is valid
+anyOf with one empty schema/string is valid
+anyOf/both anyOf valid
+anyOf/first anyOf valid
+anyOf/neither anyOf valid
+anyOf/second anyOf valid
+nested anyOf, to check validation semantics/anything non-null is invalid
+nested anyOf, to check validation semantics/null is valid

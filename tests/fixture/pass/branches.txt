@@ -1,0 +1,32 @@
+a $ref branch over an object checks the definition's fields/neither
+a $ref branch over an object checks the definition's fields/the definition's branch
+a $ref branch over an object checks the definition's fields/the other branch
+a branch over a list checks its count and items/long, an item below zero
+a branch over a list checks its count and items/long, every item at least zero
+a branch over a list checks its count and items/short
+a branch over a nested object names that object's fields/a count with its number
+a branch over a nested object names that object's fields/a count without one
+a branch over a nested object names that object's fields/another kind with one
+a branch over a nested object names that object's fields/another kind without one
+a branch over an object names a key its fields lack/the key is absent
+a branch over an object names a key its fields lack/the key is present
+a branch over an object reaches into a field's object/absent, which the second branch allows
+a branch over an object reaches into a field's object/between
+a branch over an object reaches into a field's object/large
+a branch over an object reaches into a field's object/small
+an allOf branch over an object holds where each subschema does/a large a alone
+an allOf branch over an object holds where each subschema does/a small a alone
+an allOf branch over an object holds where each subschema does/both fields
+anyOf over an object checks the fields each branch names/neither
+anyOf over an object checks the fields each branch names/nothing
+anyOf over an object checks the fields each branch names/the first branch
+anyOf over an object checks the fields each branch names/the second branch
+oneOf and anyOf judge null by the branches that admit it/an integer in both
+oneOf and anyOf judge null by the branches that admit it/an integer in no branch
+oneOf and anyOf judge null by the branches that admit it/null in a null branch
+oneOf and anyOf judge null by the branches that admit it/null in no branch of anyOf
+oneOf and anyOf judge null by the branches that admit it/null in no branch of oneOf
+oneOf and anyOf judge null by the branches that admit it/null in one branch of oneOf
+oneOf over an object fails where both branches hold, once at the object/a field's own check fails apart from the branches
+oneOf over an object fails where both branches hold, once at the object/both
+oneOf over an object fails where both branches hold, once at the object/one

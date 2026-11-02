@@ -1,0 +1,30 @@
+a later branch accepts a value the first branch's check fails/a branch that isn't a model takes it
+a later branch accepts a value the first branch's check fails/neither takes it: the first reports
+a later branch accepts a value the first branch's check fails/that branch's check fails
+a later branch accepts a value the first branch's check fails/the first takes it
+a later branch accepts a value the first branch's check fails/the second takes it where the first's check fails
+a union field of a model beside other fields/the first fails its check
+a union field of a model beside other fields/the second
+a value both branches take is the first's/both take it
+a value both branches take is the first's/only the second takes it
+anyOf over a constant and a list is a union of text and a list/a list
+anyOf over a constant and a list is a union of text and a list/an empty list
+anyOf over a constant and a list is a union of text and a list/of another kind
+anyOf over a constant and a list is a union of text and a list/text no branch holds
+anyOf over a constant and a list is a union of text and a list/the constant
+anyOf over a model, an integer, and a nullable text/null
+anyOf over a model, an integer, and a nullable text/text
+anyOf over a model, an integer, and a nullable text/text too long
+anyOf over a model, an integer, and a nullable text/the integer
+anyOf over a model, an integer, and a nullable text/the model
+anyOf over plain types with bounds takes the first branch whose check passes/neither takes it
+anyOf over plain types with bounds takes the first branch whose check passes/the first takes it
+anyOf over plain types with bounds takes the first branch whose check passes/the second takes it where the first's check fails
+anyOf over three models, one inline, checks a nested field in its variant/the first
+anyOf over three models, one inline, checks a nested field in its variant/the inline one
+anyOf over three models, one inline, checks a nested field in its variant/the inline one fails below
+anyOf over three models, one inline, checks a nested field in its variant/the third
+anyOf over two object models is a union of them/fits the first
+anyOf over two object models is a union of them/fits the first and fails its check
+anyOf over two object models is a union of them/fits the second
+anyOf over two object models is a union of them/of another kind

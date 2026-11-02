@@ -1,0 +1,70 @@
+[
+    {
+        "description": "a reading with fields and other keys of one type",
+        "schema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": { "id": { "type": "string" } },
+            "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "tests": [
+            { "description": "no other key", "data": { "id": "a" }, "valid": true, "failures": [] },
+            { "description": "other keys in range", "data": { "id": "a", "x": 1, "y": 2 }, "valid": true, "failures": [] },
+            { "description": "an other key below its bound", "data": { "id": "a", "x": -1 }, "valid": false, "failures": ["Value.*: range"] }
+        ]
+    },
+    {
+        "description": "keys by pattern, the rest closed",
+        "schema": {
+            "type": "object",
+            "patternProperties": { "^temp_": { "type": "number", "maximum": 100 } },
+            "additionalProperties": false
+        },
+        "tests": [
+            { "description": "a key by pattern", "data": { "temp_a": 20.5 }, "valid": true, "failures": [] },
+            { "description": "a key by pattern past its bound", "data": { "temp_a": 120.5 }, "valid": false, "failures": ["Value.*: range"] },
+            { "description": "a key by no pattern", "data": { "temp_a": 20.5, "other": 2.5 }, "valid": false, "failures": ["Value.*: range"] }
+        ]
+    },
+    {
+        "description": "key names and a count on an open object",
+        "schema": {
+            "type": "object",
+            "properties": { "id": { "type": "string" } },
+            "propertyNames": { "maxLength": 3 },
+            "minProperties": 2
+        },
+        "tests": [
+            { "description": "short names", "data": { "id": "a", "x": 1 }, "valid": true, "failures": [] },
+            { "description": "a long other name", "data": { "id": "a", "long": 1 }, "valid": false, "failures": ["Value: range"] },
+            { "description": "too few keys", "data": { "id": "a" }, "valid": false, "failures": ["Value: range"] }
+        ]
+    },
+    {
+        "description": "required and dependent keys no field names",
+        "schema": {
+            "type": "object",
+            "properties": { "id": { "type": "string" } },
+            "required": ["seen"],
+            "dependentRequired": { "id": ["note"] }
+        },
+        "tests": [
+            { "description": "both present", "data": { "id": "a", "seen": 1, "note": 2 }, "valid": true, "failures": [] },
+            { "description": "the required key absent", "data": { "id": "a", "note": 2 }, "valid": false, "failures": ["Value.seen: absent"] },
+            { "description": "the dependent key absent", "data": { "id": "a", "seen": 1 }, "valid": false, "failures": ["Value.note: absent"] }
+        ]
+    },
+    {
+        "description": "a map of one type",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "levels": { "type": "object", "additionalProperties": { "type": "integer", "maximum": 9 } }
+            }
+        },
+        "tests": [
+            { "description": "values in range", "data": { "levels": { "a": 1, "b": 9 } }, "valid": true, "failures": [] },
+            { "description": "a value past its bound", "data": { "levels": { "a": 10 } }, "valid": false, "failures": ["Value.levels.*: range"] }
+        ]
+    }
+]

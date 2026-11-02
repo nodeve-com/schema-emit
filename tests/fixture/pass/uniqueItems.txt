@@ -1,0 +1,34 @@
+uniqueItems validation/non-unique array of arrays is invalid
+uniqueItems validation/non-unique array of integers is invalid
+uniqueItems validation/non-unique array of more than two arrays is invalid
+uniqueItems validation/non-unique array of more than two integers is invalid
+uniqueItems validation/non-unique array of strings is invalid
+uniqueItems validation/numbers are unique if mathematically unequal
+uniqueItems validation/unique array of arrays is valid
+uniqueItems validation/unique array of integers is valid
+uniqueItems validation/unique array of strings is valid
+uniqueItems with an array of items and additionalItems=false/[false, false] from items array is not valid
+uniqueItems with an array of items and additionalItems=false/[false, true] from items array is valid
+uniqueItems with an array of items and additionalItems=false/[true, false] from items array is valid
+uniqueItems with an array of items and additionalItems=false/[true, true] from items array is not valid
+uniqueItems=false validation/non-unique array of arrays is valid
+uniqueItems=false validation/non-unique array of integers is valid
+uniqueItems=false validation/non-unique array of nested objects is valid
+uniqueItems=false validation/non-unique array of objects is valid
+uniqueItems=false validation/numbers are unique if mathematically unequal
+uniqueItems=false validation/unique array of arrays is valid
+uniqueItems=false validation/unique array of integers is valid
+uniqueItems=false validation/unique array of nested objects is valid
+uniqueItems=false validation/unique array of objects is valid
+uniqueItems=false with an array of items and additionalItems=false/[false, false] from items array is valid
+uniqueItems=false with an array of items and additionalItems=false/[false, true] from items array is valid
+uniqueItems=false with an array of items and additionalItems=false/[true, false] from items array is valid
+uniqueItems=false with an array of items and additionalItems=false/[true, true] from items array is valid
+uniqueItems=false with an array of items/[false, false] from items array is valid
+uniqueItems=false with an array of items/[false, true] from items array is valid
+uniqueItems=false with an array of items/[true, false] from items array is valid
+uniqueItems=false with an array of items/[true, true] from items array is valid
+uniqueItems=false with an array of items/non-unique array extended from [false, true] is valid
+uniqueItems=false with an array of items/non-unique array extended from [true, false] is valid
+uniqueItems=false with an array of items/unique array extended from [false, true] is valid
+uniqueItems=false with an array of items/unique array extended from [true, false] is valid

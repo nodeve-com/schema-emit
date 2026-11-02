@@ -1,0 +1,14 @@
+maxContains = 0 with minContains = 0/empty array
+maxContains = 0 with minContains = 0/one matching item
+maxContains with contains, value with a decimal/one element matches, valid maxContains
+maxContains with contains, value with a decimal/too many elements match, invalid maxContains
+maxContains with contains/all elements match, invalid maxContains
+maxContains with contains/all elements match, valid maxContains
+maxContains with contains/empty data
+maxContains with contains/some elements match, invalid maxContains
+maxContains with contains/some elements match, valid maxContains
+maxContains without contains is ignored/one item valid against lone maxContains
+maxContains without contains is ignored/two items still valid against lone maxContains
+minContains < maxContains/actual < minContains < maxContains
+minContains < maxContains/minContains < actual < maxContains
+minContains < maxContains/minContains < maxContains < actual

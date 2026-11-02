@@ -1,0 +1,30 @@
+[package]
+name = "schema-emit-runtime"
+description = "What checks that schema-emit writes link: why a value fails, and where a failure goes."
+version = "0.6.2"
+edition = "2021"
+license = "MPL-2.0"
+repository = "https://github.com/nodeve-com/schema-emit"
+include = ["src", "README.md", "LICENSE"]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"
+struct_excessive_bools = "deny"
+fn_params_excessive_bools = "deny"
+
+[features]
+# Decoding a `serde_json::Value` into the std form: the one part that needs an allocator.
+decode = ["dep:serde_json", "dep:chrono", "dep:humantime", "dep:base64"]
+
+[dependencies]
+# Search only: a pattern check walks a table that schema-emit built.
+pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "787bf8ce5c92ebc0b84ae91f028f1861d8744252", version = "0.6.2" }
+serde_json = { version = "1", features = ["preserve_order", "raw_value"], optional = true }
+# The reader of `human-duration` text: an optional sign, then humantime's text.
+humantime = { version = "2", optional = true }
+# A std value of a timestamp or a duration is a chrono type.
+chrono = { version = "0.4", default-features = false, optional = true }
+base64 = { version = "0.22", features = ["std"], optional = true }

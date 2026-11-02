@@ -1,0 +1,10 @@
+maxProperties = 0 means the object is empty/no properties is valid
+maxProperties = 0 means the object is empty/one property is invalid
+maxProperties validation with a decimal/shorter is valid
+maxProperties validation with a decimal/too long is invalid
+maxProperties validation/exact length is valid
+maxProperties validation/ignores arrays
+maxProperties validation/ignores other non-objects
+maxProperties validation/ignores strings
+maxProperties validation/shorter is valid
+maxProperties validation/too long is invalid

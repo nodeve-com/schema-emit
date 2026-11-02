@@ -1,0 +1,20 @@
+a chain of objects, each referring to the whole schema/one object
+a chain of objects, each referring to the whole schema/the last object out of range
+a chain of objects, each referring to the whole schema/three objects
+a field of annotations only, holding any kind/a number
+a field of annotations only, holding any kind/a string
+a field of annotations only, holding any kind/an object
+a field of the metaschema, holding an object/a boolean
+a field of the metaschema, holding an object/an object
+a list step beside a field step/a kid out of range
+a list step beside a field step/both steps
+a tree reaching itself by two steps/both sides
+a tree reaching itself by two steps/left, then right, then out of range
+a tree reaching itself by two steps/one side out of range
+a tree reaching itself by two steps/right five deep, past the indices a failure keeps
+a tree through a list, by anchor/a leaf
+a tree through a list, by anchor/two levels
+an id resolves a relative reference, a pointer reaches into properties/outside
+an id resolves a relative reference, a pointer reaches into properties/within
+pointers escape slashes, tildes, and percent signs/all within
+pointers escape slashes, tildes, and percent signs/each past its bound

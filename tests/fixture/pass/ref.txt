@@ -1,0 +1,53 @@
+$id must be resolved against nearest parent, not just immediate parent/number is valid
+$id with file URI still resolves pointers - *nix/non-number is invalid
+$id with file URI still resolves pointers - *nix/number is valid
+$id with file URI still resolves pointers - windows/non-number is invalid
+$id with file URI still resolves pointers - windows/number is valid
+Recursive references between schemas/invalid tree
+Recursive references between schemas/valid tree
+URN base URI with NSS/a non-string is invalid
+URN base URI with NSS/a string is valid
+URN base URI with URN and JSON pointer ref/a non-string is invalid
+URN base URI with URN and JSON pointer ref/a string is valid
+URN base URI with URN and anchor ref/a non-string is invalid
+URN base URI with URN and anchor ref/a string is valid
+URN base URI with q-component/a non-string is invalid
+URN base URI with q-component/a string is valid
+URN base URI with r-component/a non-string is invalid
+URN base URI with r-component/a string is valid
+URN ref with nested pointer ref/a non-string is invalid
+URN ref with nested pointer ref/a string is valid
+empty tokens in $ref json-pointer/number is valid
+escaped pointer ref/percent invalid
+escaped pointer ref/percent valid
+escaped pointer ref/slash invalid
+escaped pointer ref/slash valid
+escaped pointer ref/tilde invalid
+escaped pointer ref/tilde valid
+naive replacement of $ref with its destination is not correct/do not evaluate the $ref inside the enum, matching any string
+nested refs/nested ref invalid
+nested refs/nested ref valid
+order of evaluation: $id and $ref on nested schema/data is invalid against nested sibling
+order of evaluation: $id and $ref on nested schema/data is valid against nested sibling
+property named $ref that is not a reference/property named $ref invalid
+property named $ref that is not a reference/property named $ref valid
+property named $ref, containing an actual $ref/property named $ref invalid
+property named $ref, containing an actual $ref/property named $ref valid
+ref to else/a non-integer is invalid due to the $ref
+ref to else/an integer is valid
+ref to if/a non-integer is invalid due to the $ref
+ref to if/an integer is valid
+ref to then/a non-integer is invalid due to the $ref
+ref to then/an integer is valid
+ref with absolute-path-reference/a string is valid
+ref with absolute-path-reference/an integer is invalid
+refs with quote/object with numbers is valid
+refs with quote/object with strings is invalid
+relative pointer ref to array/match array
+relative pointer ref to array/mismatch array
+relative pointer ref to object/match
+relative pointer ref to object/mismatch
+remote ref, containing refs itself/remote ref invalid
+remote ref, containing refs itself/remote ref valid
+simple URN base URI with JSON pointer/a non-string is invalid
+simple URN base URI with JSON pointer/a string is valid

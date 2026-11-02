@@ -1,0 +1,2 @@
+validate definition against metaschema/invalid definition schema
+validate definition against metaschema/valid definition schema

@@ -1,0 +1,4 @@
+exclusiveMaximum validation/above the exclusiveMaximum is invalid
+exclusiveMaximum validation/below the exclusiveMaximum is valid
+exclusiveMaximum validation/boundary point is invalid
+exclusiveMaximum validation/ignores non-numbers

@@ -1,0 +1,21 @@
+non-array instances are valid/ignores booleans
+non-array instances are valid/ignores floats
+non-array instances are valid/ignores integers
+non-array instances are valid/ignores null
+non-array instances are valid/ignores objects
+non-array instances are valid/ignores strings
+unevaluatedItems as schema/with invalid unevaluated items
+unevaluatedItems as schema/with no unevaluated items
+unevaluatedItems as schema/with valid unevaluated items
+unevaluatedItems false/with no unevaluated items
+unevaluatedItems false/with unevaluated items
+unevaluatedItems true/with no unevaluated items
+unevaluatedItems true/with unevaluated items
+unevaluatedItems with boolean schemas/with no unevaluated items
+unevaluatedItems with boolean schemas/with unevaluated items
+unevaluatedItems with items and prefixItems/unevaluatedItems doesn't apply
+unevaluatedItems with items/invalid under items
+unevaluatedItems with items/valid under items
+unevaluatedItems with null instance elements/allows null elements
+unevaluatedItems with tuple/with no unevaluated items
+unevaluatedItems with uniform items/unevaluatedItems doesn't apply

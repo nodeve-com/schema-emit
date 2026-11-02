@@ -1,0 +1,52 @@
+validation of duration strings/a comma as the decimal separator is invalid
+validation of duration strings/a component with many digits is valid
+validation of duration strings/a leading sign is not allowed
+validation of duration strings/a leading zero in a component is valid
+validation of duration strings/a number before the time separator has no unit
+validation of duration strings/a sign inside a component is invalid
+validation of duration strings/a trailing newline is invalid
+validation of duration strings/a valid duration string
+validation of duration strings/all date and time components
+validation of duration strings/all string formats ignore arrays
+validation of duration strings/all string formats ignore booleans
+validation of duration strings/all string formats ignore floats
+validation of duration strings/all string formats ignore integers
+validation of duration strings/all string formats ignore nulls
+validation of duration strings/all string formats ignore objects
+validation of duration strings/an invalid duration string
+validation of duration strings/date components only
+validation of duration strings/element without unit
+validation of duration strings/elements out of order
+validation of duration strings/empty string is invalid
+validation of duration strings/exponent notation is not allowed in a component
+validation of duration strings/four years duration
+validation of duration strings/fractional duration is not allowed by RFC 3339 ABNF
+validation of duration strings/hour and minute
+validation of duration strings/hours and minutes can appear without seconds
+validation of duration strings/hours and seconds cannot appear without minutes
+validation of duration strings/invalid non-ASCII '২' (a Bengali 2)
+validation of duration strings/leading whitespace is invalid
+validation of duration strings/minutes and seconds can appear without hour
+validation of duration strings/missing time separator
+validation of duration strings/month and day
+validation of duration strings/months and days can appear without years
+validation of duration strings/multi-digit values in all components
+validation of duration strings/must start with P
+validation of duration strings/no date or time elements present
+validation of duration strings/no elements present
+validation of duration strings/no time elements present
+validation of duration strings/one and a half days, in days and hours
+validation of duration strings/one and a half days, in hours
+validation of duration strings/one minute duration
+validation of duration strings/one month duration
+validation of duration strings/time components only
+validation of duration strings/time element in the date position
+validation of duration strings/trailing whitespace is invalid
+validation of duration strings/two weeks
+validation of duration strings/weeks cannot be combined with a time component
+validation of duration strings/weeks cannot be combined with a zero-valued component
+validation of duration strings/weeks cannot be combined with other units
+validation of duration strings/years and days cannot appear without months
+validation of duration strings/years and months can appear without days
+validation of duration strings/zero time, in days
+validation of duration strings/zero time, in seconds

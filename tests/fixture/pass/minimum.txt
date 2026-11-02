@@ -1,0 +1,11 @@
+minimum validation with signed integer/boundary point is valid
+minimum validation with signed integer/boundary point with float is valid
+minimum validation with signed integer/float below the minimum is invalid
+minimum validation with signed integer/ignores non-numbers
+minimum validation with signed integer/int below the minimum is invalid
+minimum validation with signed integer/negative above the minimum is valid
+minimum validation with signed integer/positive above the minimum is valid
+minimum validation/above the minimum is valid
+minimum validation/below the minimum is invalid
+minimum validation/boundary point is valid
+minimum validation/ignores non-numbers

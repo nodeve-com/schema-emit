@@ -1,0 +1,133 @@
+date format/all string formats ignore arrays
+date format/all string formats ignore booleans
+date format/all string formats ignore floats
+date format/all string formats ignore integers
+date format/all string formats ignore nulls
+date format/all string formats ignore objects
+date format/invalid date string is only an annotation by default
+date-time format/all string formats ignore arrays
+date-time format/all string formats ignore booleans
+date-time format/all string formats ignore floats
+date-time format/all string formats ignore integers
+date-time format/all string formats ignore nulls
+date-time format/all string formats ignore objects
+date-time format/invalid date-time string is only an annotation by default
+duration format/all string formats ignore arrays
+duration format/all string formats ignore booleans
+duration format/all string formats ignore floats
+duration format/all string formats ignore integers
+duration format/all string formats ignore nulls
+duration format/all string formats ignore objects
+duration format/invalid duration string is only an annotation by default
+email format/all string formats ignore arrays
+email format/all string formats ignore booleans
+email format/all string formats ignore floats
+email format/all string formats ignore integers
+email format/all string formats ignore nulls
+email format/all string formats ignore objects
+email format/invalid email string is only an annotation by default
+hostname format/all string formats ignore arrays
+hostname format/all string formats ignore booleans
+hostname format/all string formats ignore floats
+hostname format/all string formats ignore integers
+hostname format/all string formats ignore nulls
+hostname format/all string formats ignore objects
+hostname format/invalid hostname string is only an annotation by default
+idn-email format/all string formats ignore arrays
+idn-email format/all string formats ignore booleans
+idn-email format/all string formats ignore floats
+idn-email format/all string formats ignore integers
+idn-email format/all string formats ignore nulls
+idn-email format/all string formats ignore objects
+idn-email format/invalid idn-email string is only an annotation by default
+idn-hostname format/all string formats ignore arrays
+idn-hostname format/all string formats ignore booleans
+idn-hostname format/all string formats ignore floats
+idn-hostname format/all string formats ignore integers
+idn-hostname format/all string formats ignore nulls
+idn-hostname format/all string formats ignore objects
+idn-hostname format/invalid idn-hostname string is only an annotation by default
+ipv4 format/all string formats ignore arrays
+ipv4 format/all string formats ignore booleans
+ipv4 format/all string formats ignore floats
+ipv4 format/all string formats ignore integers
+ipv4 format/all string formats ignore nulls
+ipv4 format/all string formats ignore objects
+ipv4 format/invalid ipv4 string is only an annotation by default
+ipv6 format/all string formats ignore arrays
+ipv6 format/all string formats ignore booleans
+ipv6 format/all string formats ignore floats
+ipv6 format/all string formats ignore integers
+ipv6 format/all string formats ignore nulls
+ipv6 format/all string formats ignore objects
+ipv6 format/invalid ipv6 string is only an annotation by default
+iri format/all string formats ignore arrays
+iri format/all string formats ignore booleans
+iri format/all string formats ignore floats
+iri format/all string formats ignore integers
+iri format/all string formats ignore nulls
+iri format/all string formats ignore objects
+iri format/invalid iri string is only an annotation by default
+iri-reference format/all string formats ignore arrays
+iri-reference format/all string formats ignore booleans
+iri-reference format/all string formats ignore floats
+iri-reference format/all string formats ignore integers
+iri-reference format/all string formats ignore nulls
+iri-reference format/all string formats ignore objects
+iri-reference format/invalid iri-reference string is only an annotation by default
+json-pointer format/all string formats ignore arrays
+json-pointer format/all string formats ignore booleans
+json-pointer format/all string formats ignore floats
+json-pointer format/all string formats ignore integers
+json-pointer format/all string formats ignore nulls
+json-pointer format/all string formats ignore objects
+json-pointer format/invalid json-pointer string is only an annotation by default
+regex format/all string formats ignore arrays
+regex format/all string formats ignore booleans
+regex format/all string formats ignore floats
+regex format/all string formats ignore integers
+regex format/all string formats ignore nulls
+regex format/all string formats ignore objects
+regex format/invalid regex string is only an annotation by default
+relative-json-pointer format/all string formats ignore arrays
+relative-json-pointer format/all string formats ignore booleans
+relative-json-pointer format/all string formats ignore floats
+relative-json-pointer format/all string formats ignore integers
+relative-json-pointer format/all string formats ignore nulls
+relative-json-pointer format/all string formats ignore objects
+relative-json-pointer format/invalid relative-json-pointer string is only an annotation by default
+time format/all string formats ignore arrays
+time format/all string formats ignore booleans
+time format/all string formats ignore floats
+time format/all string formats ignore integers
+time format/all string formats ignore nulls
+time format/all string formats ignore objects
+time format/invalid time string is only an annotation by default
+uri format/all string formats ignore arrays
+uri format/all string formats ignore booleans
+uri format/all string formats ignore floats
+uri format/all string formats ignore integers
+uri format/all string formats ignore nulls
+uri format/all string formats ignore objects
+uri format/invalid uri string is only an annotation by default
+uri-reference format/all string formats ignore arrays
+uri-reference format/all string formats ignore booleans
+uri-reference format/all string formats ignore floats
+uri-reference format/all string formats ignore integers
+uri-reference format/all string formats ignore nulls
+uri-reference format/all string formats ignore objects
+uri-reference format/invalid uri-reference string is only an annotation by default
+uri-template format/all string formats ignore arrays
+uri-template format/all string formats ignore booleans
+uri-template format/all string formats ignore floats
+uri-template format/all string formats ignore integers
+uri-template format/all string formats ignore nulls
+uri-template format/all string formats ignore objects
+uri-template format/invalid uri-template string is only an annotation by default
+uuid format/all string formats ignore arrays
+uuid format/all string formats ignore booleans
+uuid format/all string formats ignore floats
+uuid format/all string formats ignore integers
+uuid format/all string formats ignore nulls
+uuid format/all string formats ignore objects
+uuid format/invalid uuid string is only an annotation by default

@@ -1,0 +1,15 @@
+additionalProperties are allowed by default/additional properties are allowed
+additionalProperties being false does not allow other properties/ignores arrays
+additionalProperties being false does not allow other properties/ignores other non-objects
+additionalProperties being false does not allow other properties/ignores strings
+additionalProperties being false does not allow other properties/no additional properties is valid
+additionalProperties being false does not allow other properties/patternProperties are not additional properties
+additionalProperties can exist by itself/an additional invalid property is invalid
+additionalProperties can exist by itself/an additional valid property is valid
+additionalProperties does not look in applicators/properties defined in allOf are not examined
+additionalProperties with null valued instance properties/allows null values
+additionalProperties with propertyNames/Valid against both keywords
+additionalProperties with schema/an additional invalid property is invalid
+additionalProperties with schema/an additional valid property is valid
+additionalProperties with schema/no additional properties is valid
+non-ASCII pattern with additionalProperties/matching the pattern is valid

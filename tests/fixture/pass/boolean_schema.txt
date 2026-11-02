@@ -1,0 +1,18 @@
+boolean schema 'false'/array is invalid
+boolean schema 'false'/boolean false is invalid
+boolean schema 'false'/boolean true is invalid
+boolean schema 'false'/empty array is invalid
+boolean schema 'false'/empty object is invalid
+boolean schema 'false'/null is invalid
+boolean schema 'false'/number is invalid
+boolean schema 'false'/object is invalid
+boolean schema 'false'/string is invalid
+boolean schema 'true'/array is valid
+boolean schema 'true'/boolean false is valid
+boolean schema 'true'/boolean true is valid
+boolean schema 'true'/empty array is valid
+boolean schema 'true'/empty object is valid
+boolean schema 'true'/null is valid
+boolean schema 'true'/number is valid
+boolean schema 'true'/object is valid
+boolean schema 'true'/string is valid

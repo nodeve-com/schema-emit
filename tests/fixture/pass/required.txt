@@ -1,0 +1,17 @@
+required default validation/not required by default
+required properties whose names are Javascript object property names/__proto__ present
+required properties whose names are Javascript object property names/all present
+required properties whose names are Javascript object property names/constructor present
+required properties whose names are Javascript object property names/ignores arrays
+required properties whose names are Javascript object property names/ignores other non-objects
+required properties whose names are Javascript object property names/none of the properties mentioned
+required properties whose names are Javascript object property names/toString present
+required validation/ignores arrays
+required validation/ignores boolean
+required validation/ignores null
+required validation/ignores other non-objects
+required validation/ignores strings
+required validation/present required property is valid
+required with empty array/property not required
+required with escaped characters/object with all properties present is valid
+required with escaped characters/object with some properties missing is invalid

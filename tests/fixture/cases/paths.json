@@ -1,0 +1,58 @@
+[
+    {
+        "description": "a reading",
+        "schema": {
+            "type": "object",
+            "required": ["climate", "mode", "readings"],
+            "properties": {
+                "climate": {
+                    "type": "object",
+                    "required": ["temp_c"],
+                    "properties": {
+                        "temp_c": { "type": "number", "format": "float", "minimum": -40, "maximum": 85, "unit": "Cel", "quantityKind": "temperature" },
+                        "rh": { "type": "number", "format": "float", "minimum": 0, "maximum": 100, "unit": "%", "quantityKind": "relative_humidity" }
+                    }
+                },
+                "mode": { "enum": ["auto", "manual"], "type": "string" },
+                "name": { "type": "string", "minLength": 1, "maxLength": 8 },
+                "readings": {
+                    "type": "array",
+                    "maxItems": 3,
+                    "items": { "type": "integer", "format": "int16" }
+                }
+            }
+        },
+        "tests": [
+            {
+                "description": "all in range",
+                "data": { "climate": { "temp_c": 21.5, "rh": 40 }, "mode": "auto", "name": "hall", "readings": [1, -2] },
+                "valid": true,
+                "failures": []
+            },
+            {
+                "description": "an optional field absent is silence",
+                "data": { "climate": { "temp_c": 21.5 }, "mode": "auto", "readings": [] },
+                "valid": true,
+                "failures": []
+            },
+            {
+                "description": "a nested field out of range",
+                "data": { "climate": { "temp_c": 90, "rh": 40 }, "mode": "auto", "readings": [] },
+                "valid": false,
+                "failures": ["Value.climate.temp_c: range"]
+            },
+            {
+                "description": "a required field absent",
+                "data": { "climate": { "rh": 40 }, "readings": [] },
+                "valid": false,
+                "failures": ["Value.climate.temp_c: absent", "Value.mode: absent"]
+            },
+            {
+                "description": "a list item past its width, and every failure reported",
+                "data": { "climate": { "temp_c": 20 }, "mode": "off", "name": "a long name", "readings": [1, 40000, -40000, 2] },
+                "valid": false,
+                "failures": ["Value.mode: range", "Value.name: range", "Value.readings[1]: range", "Value.readings[2]: range", "Value.readings: range"]
+            }
+        ]
+    }
+]

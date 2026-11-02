@@ -1,0 +1,43 @@
+validation of date-time strings/2020 is a leap year
+validation of date-time strings/2021 is not a leap year
+validation of date-time strings/a numeric offset without minutes is invalid
+validation of date-time strings/a second fraction of fifteen nines is valid
+validation of date-time strings/a trailing newline is invalid
+validation of date-time strings/a valid date-time string
+validation of date-time strings/a valid date-time string with 28 days in February (normal)
+validation of date-time strings/a valid date-time string with minus offset
+validation of date-time strings/a valid date-time string with plus offset
+validation of date-time strings/a valid date-time string without second fraction
+validation of date-time strings/a valid date-time with a leap second, UTC
+validation of date-time strings/a valid date-time with a leap second, with minus offset
+validation of date-time strings/all string formats ignore arrays
+validation of date-time strings/all string formats ignore booleans
+validation of date-time strings/all string formats ignore floats
+validation of date-time strings/all string formats ignore integers
+validation of date-time strings/all string formats ignore nulls
+validation of date-time strings/all string formats ignore objects
+validation of date-time strings/an invalid closing Z after time-zone offset
+validation of date-time strings/an invalid date-time past leap second, UTC
+validation of date-time strings/an invalid date-time string
+validation of date-time strings/an invalid date-time string with 30 days in February (leap)
+validation of date-time strings/an invalid date-time string with trailing content after the offset
+validation of date-time strings/an invalid date-time string without seconds
+validation of date-time strings/an invalid date-time with leap second on a wrong hour, UTC
+validation of date-time strings/an invalid date-time with leap second on a wrong minute, UTC
+validation of date-time strings/an invalid day in date-time string
+validation of date-time strings/an invalid hour in date-time string
+validation of date-time strings/an invalid minute in date-time string
+validation of date-time strings/an invalid minute in date-time string, with a numeric offset
+validation of date-time strings/an invalid offset in date-time string
+validation of date-time strings/an invalid offset minute in date-time string
+validation of date-time strings/case-insensitive T and Z
+validation of date-time strings/century year 0100 is not a leap year
+validation of date-time strings/century year 0400 is a leap year
+validation of date-time strings/century year 2100 is not a leap year
+validation of date-time strings/hour 24 is invalid even with a leap second
+validation of date-time strings/invalid extended year
+validation of date-time strings/invalid non-ASCII '৪' (a Bengali 4) in date portion
+validation of date-time strings/invalid non-ASCII '৪' (a Bengali 4) in time portion
+validation of date-time strings/invalid non-padded day dates
+validation of date-time strings/invalid non-padded month dates
+validation of date-time strings/only RFC3339 not all of ISO 8601 are valid

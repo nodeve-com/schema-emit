@@ -1,0 +1,24 @@
+a schema given for items/JavaScript pseudo-array is valid
+a schema given for items/ignores non-arrays
+a schema given for items/valid items
+a schema given for items/wrong type of items
+items and subitems/fewer items is valid
+items and subitems/too many sub-items
+items and subitems/valid items
+items and subitems/wrong item
+items and subitems/wrong sub-item
+items with boolean schema (false)/any non-empty array is invalid
+items with boolean schema (false)/empty array is valid
+items with boolean schema (true)/any array is valid
+items with boolean schema (true)/empty array is valid
+items with heterogeneous array/valid instance
+items with null instance elements/allows null elements
+nested items/nested array with invalid type
+nested items/not deep enough
+nested items/valid nested array
+prefixItems validation adjusts the starting index for items/valid items
+prefixItems validation adjusts the starting index for items/wrong type of second item
+prefixItems with no additional items allowed/empty array
+prefixItems with no additional items allowed/equal number of items present
+prefixItems with no additional items allowed/fewer number of items present (1)
+prefixItems with no additional items allowed/fewer number of items present (2)

@@ -1,0 +1,5 @@
+pattern reads ECMA-262/a code with a final letter
+pattern reads ECMA-262/a final newline is not an anchor
+pattern reads ECMA-262/a line separator ends the dot
+pattern reads ECMA-262/a no-break space inside
+pattern reads ECMA-262/a space inside

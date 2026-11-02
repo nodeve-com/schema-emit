@@ -1,0 +1,129 @@
+[
+    {
+        "description": "a decoded reading of nested climate, its scalars shared",
+        "schema": {
+            "$defs": {
+                "TempDegC": { "type": "number", "format": "float", "minimum": -40, "maximum": 85, "unit": "Cel", "quantityKind": "temperature" },
+                "RelHum": { "type": "number", "format": "float", "minimum": 0, "maximum": 100, "unit": "%", "quantityKind": "relative_humidity" }
+            },
+            "type": "object",
+            "required": ["climate"],
+            "properties": {
+                "climate": {
+                    "type": "object",
+                    "required": ["temp_c", "rh"],
+                    "properties": {
+                        "temp_c": { "$ref": "#/$defs/TempDegC" },
+                        "rh": { "$ref": "#/$defs/RelHum" }
+                    }
+                }
+            }
+        },
+        "tests": [
+            { "description": "in range", "data": { "climate": { "temp_c": 21.5, "rh": 40 } }, "valid": true, "failures": [] },
+            { "description": "humidity past its bound", "data": { "climate": { "temp_c": 21.5, "rh": 101 } }, "valid": false, "failures": ["Value.climate.rh: range"] },
+            { "description": "temperature absent", "data": { "climate": { "rh": 40 } }, "valid": false, "failures": ["Value.climate.temp_c: absent"] }
+        ]
+    },
+    {
+        "description": "a computed comfort",
+        "schema": {
+            "$defs": {
+                "TempDegF": { "type": "number", "format": "float", "minimum": -40, "maximum": 185, "unit": "[degF]", "quantityKind": "temperature" },
+                "TempDegC": { "type": "number", "format": "float", "minimum": -40, "maximum": 85, "unit": "Cel", "quantityKind": "temperature" }
+            },
+            "type": "object",
+            "required": ["temp_f", "dewpoint_c", "muggy"],
+            "properties": {
+                "temp_f": { "$ref": "#/$defs/TempDegF" },
+                "dewpoint_c": { "$ref": "#/$defs/TempDegC" },
+                "muggy": { "type": "boolean" }
+            }
+        },
+        "tests": [
+            { "description": "in range", "data": { "temp_f": 70.7, "dewpoint_c": 7.6, "muggy": false }, "valid": true, "failures": [] },
+            { "description": "every field failing", "data": { "temp_f": 190, "dewpoint_c": -41 }, "valid": false, "failures": ["Value.temp_f: range", "Value.dewpoint_c: range", "Value.muggy: absent"] }
+        ]
+    },
+    {
+        "description": "a list of days, each a shared model, a field narrowing its shared type",
+        "schema": {
+            "$defs": {
+                "Watts": { "type": "number", "format": "float", "minimum": 0, "maximum": 10000, "unit": "W", "quantityKind": "power" },
+                "Day": {
+                    "type": "object",
+                    "required": ["ts", "watts"],
+                    "properties": { "ts": { "type": "integer", "format": "int64" }, "watts": { "$ref": "#/$defs/Watts" } }
+                }
+            },
+            "type": "object",
+            "required": ["days"],
+            "properties": {
+                "days": { "type": "array", "maxItems": 15, "items": { "$ref": "#/$defs/Day" } },
+                "peak": { "$ref": "#/$defs/Watts", "maximum": 5000 }
+            }
+        },
+        "tests": [
+            { "description": "in range", "data": { "days": [{ "ts": 0, "watts": 10 }, { "ts": 86400000, "watts": 9000 }], "peak": 4000 }, "valid": true, "failures": [] },
+            { "description": "an item's field failing", "data": { "days": [{ "ts": 0, "watts": 10 }, { "ts": 86400000, "watts": -1 }] }, "valid": false, "failures": ["Value.days[1].watts: range"] },
+            { "description": "the narrowed bound", "data": { "days": [], "peak": 6000 }, "valid": false, "failures": ["Value.peak: range"] },
+            { "description": "an item's field absent", "data": { "days": [{ "ts": 0 }] }, "valid": false, "failures": ["Value.days[0].watts: absent"] }
+        ]
+    },
+    {
+        "description": "a model of one 64-bit count",
+        "schema": { "type": "object", "required": ["ticks"], "properties": { "ticks": { "type": "integer", "format": "int64" } } },
+        "tests": [
+            { "description": "a count", "data": { "ticks": 7 }, "valid": true, "failures": [] },
+            { "description": "absent", "data": {}, "valid": false, "failures": ["Value.ticks: absent"] }
+        ]
+    },
+    {
+        "description": "a closed model's dependent fields, one naming no field",
+        "schema": {
+            "type": "object",
+            "required": ["reading"],
+            "properties": {
+                "reading": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "a": { "type": "integer" },
+                        "b": { "type": "integer" },
+                        "c": { "type": "integer" }
+                    },
+                    "dependentRequired": { "a": ["b", "c"], "b": ["gone"] }
+                }
+            }
+        },
+        "tests": [
+            { "description": "neither", "data": { "reading": {} }, "valid": true, "failures": [] },
+            { "description": "c alone", "data": { "reading": { "c": 3 } }, "valid": true, "failures": [] },
+            { "description": "a alone", "data": { "reading": { "a": 1 } }, "valid": false, "failures": ["Value.reading.b: absent", "Value.reading.c: absent"] },
+            { "description": "b alone names a field no model holds", "data": { "reading": { "b": 2 } }, "valid": false, "failures": ["Value.reading.gone: absent"] },
+            { "description": "a with b and c, still naming a field no model holds", "data": { "reading": { "a": 1, "b": 2, "c": 3 } }, "valid": false, "failures": ["Value.reading.gone: absent"] }
+        ]
+    },
+    {
+        "description": "a closed root's count of fields and its dependent field",
+        "schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "maxProperties": 2,
+            "properties": {
+                "a": { "type": "integer" },
+                "b": { "type": "integer" },
+                "c": { "type": "integer" }
+            },
+            "dependentRequired": { "a": ["b"] }
+        },
+        "tests": [
+            { "description": "two fields, one requiring the other", "data": { "a": 1, "b": 2 }, "valid": true, "failures": [] },
+            { "description": "b and c", "data": { "b": 1, "c": 2 }, "valid": true, "failures": [] },
+            { "description": "none, under the minimum", "data": {}, "valid": false, "failures": ["Value: range"] },
+            { "description": "three fields, over the maximum", "data": { "a": 1, "b": 2, "c": 3 }, "valid": false, "failures": ["Value: range"] },
+            { "description": "a alone, its dependent absent", "data": { "a": 1 }, "valid": false, "failures": ["Value.b: absent"] }
+        ]
+    }
+]

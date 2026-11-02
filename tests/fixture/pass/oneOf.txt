@@ -1,0 +1,23 @@
+nested oneOf, to check validation semantics/anything non-null is invalid
+nested oneOf, to check validation semantics/null is valid
+oneOf with base schema/both oneOf valid
+oneOf with base schema/mismatch base schema
+oneOf with base schema/one oneOf valid
+oneOf with boolean schemas, all false/any value is invalid
+oneOf with boolean schemas, all true/any value is invalid
+oneOf with boolean schemas, more than one true/any value is invalid
+oneOf with boolean schemas, one true/any value is valid
+oneOf with empty schema/both valid - invalid
+oneOf with empty schema/one valid - valid
+oneOf with missing optional property/both oneOf valid
+oneOf with missing optional property/first oneOf valid
+oneOf with missing optional property/neither oneOf valid
+oneOf with missing optional property/second oneOf valid
+oneOf with required/both invalid - invalid
+oneOf with required/both valid - invalid
+oneOf with required/first valid - valid
+oneOf with required/second valid - valid
+oneOf/both oneOf valid
+oneOf/first oneOf valid
+oneOf/neither oneOf valid
+oneOf/second oneOf valid

@@ -1,0 +1,37 @@
+[package]
+name = "schema-emit"
+description = "JSON Schema to Rust: types, readers of a parsed JSON value, and checks over typed values, linking schema-emit-runtime."
+version = "0.6.2"
+edition = "2021"
+license = "MPL-2.0"
+repository = "https://github.com/nodeve-com/schema-emit"
+include = ["src", "README.md", "MISSING.md", "LICENSE"]
+
+[workspace]
+members = ["schema-emit-runtime"]
+resolver = "2"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"
+struct_excessive_bools = "deny"
+fn_params_excessive_bools = "deny"
+
+[features]
+default = ["json-schema"]
+# The JSON Schema front end.
+json-schema = ["dep:serde_json", "dep:iri-string", "dep:percent-encoding"]
+
+[dependencies]
+pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "787bf8ce5c92ebc0b84ae91f028f1861d8744252", version = "0.6.2", features = ["build"] }
+serde_json = { version = "1", features = ["preserve_order", "raw_value"], optional = true }
+# A `$ref` resolves against its schema's base URI, and its fragment percent-decodes.
+iri-string = { version = "0.7", default-features = false, features = ["alloc"], optional = true }
+percent-encoding = { version = "2", optional = true }
+
+[dev-dependencies]
+serde_json = { version = "1", features = ["preserve_order", "raw_value"] }
+# The suite reads why a decode fails.
+schema-emit-runtime = { path = "schema-emit-runtime", version = "0.6.2", features = ["decode"] }

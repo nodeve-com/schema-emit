@@ -1,0 +1,44 @@
+characters with the same visual representation but different codepoint/character looks the same but uses a different codepoint
+characters with the same visual representation but different codepoint/character uses the same codepoint
+characters with the same visual representation, but different number of codepoints/character looks the same but uses combining marks
+characters with the same visual representation, but different number of codepoints/character uses the same codepoint
+const validation/another type is invalid
+const validation/another value is invalid
+const validation/same value is valid
+const with -2.0 matches integer and float types/float -2.0 is valid
+const with -2.0 matches integer and float types/float -2.00001 is invalid
+const with -2.0 matches integer and float types/float 2.0 is invalid
+const with -2.0 matches integer and float types/integer -2 is valid
+const with -2.0 matches integer and float types/integer 2 is invalid
+const with 0 does not match other zero-like types/empty array is invalid
+const with 0 does not match other zero-like types/empty object is invalid
+const with 0 does not match other zero-like types/empty string is invalid
+const with 0 does not match other zero-like types/false is invalid
+const with 0 does not match other zero-like types/float zero is valid
+const with 0 does not match other zero-like types/integer zero is valid
+const with 1 does not match true/float one is valid
+const with 1 does not match true/integer one is valid
+const with 1 does not match true/true is invalid
+const with [false] does not match [0]/[0.0] is invalid
+const with [false] does not match [0]/[0] is invalid
+const with [false] does not match [0]/[false] is valid
+const with [true] does not match [1]/[1.0] is invalid
+const with [true] does not match [1]/[1] is invalid
+const with [true] does not match [1]/[true] is valid
+const with array/another array item is invalid
+const with array/array with additional items is invalid
+const with false does not match 0/false is valid
+const with false does not match 0/float zero is invalid
+const with false does not match 0/integer zero is invalid
+const with null/not null is invalid
+const with null/null is valid
+const with object/another type is invalid
+const with true does not match 1/float one is invalid
+const with true does not match 1/integer one is invalid
+const with true does not match 1/true is valid
+float and integers are equal up to 64-bit representation limits/float is valid
+float and integers are equal up to 64-bit representation limits/float minus one is invalid
+float and integers are equal up to 64-bit representation limits/integer is valid
+float and integers are equal up to 64-bit representation limits/integer minus one is invalid
+nul characters in strings/do not match string lacking nul
+nul characters in strings/match string with nul

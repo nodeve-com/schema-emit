@@ -1,0 +1,156 @@
+[
+    {
+        "description": "anyOf over two object models is a union of them",
+        "schema": {
+            "$ref": "#/$defs/Pick",
+            "$defs": {
+                "Pick": { "anyOf": [{ "$ref": "#/$defs/A" }, { "$ref": "#/$defs/B" }] },
+                "A": { "type": "object", "properties": { "a": { "type": "integer", "minimum": 0 } }, "required": ["a"] },
+                "B": { "type": "object", "properties": { "b": { "type": "string" } }, "required": ["b"] }
+            }
+        },
+        "tests": [
+            { "description": "fits the first", "data": { "a": 1 }, "valid": true, "failures": [] },
+            { "description": "fits the second", "data": { "b": "x" }, "valid": true, "failures": [] },
+            { "description": "fits the first and fails its check", "data": { "a": -1 }, "valid": false, "failures": ["Value.value.a: range"] },
+            { "description": "fits neither", "data": {}, "valid": false },
+            { "description": "of another kind", "data": 1, "valid": false }
+        ]
+    },
+    {
+        "description": "a value both branches take is the first's",
+        "schema": {
+            "$ref": "#/$defs/Pick",
+            "$defs": {
+                "Pick": { "anyOf": [{ "$ref": "#/$defs/Plain" }, { "$ref": "#/$defs/Tagged" }] },
+                "Plain": { "type": "object", "properties": { "id": { "type": "integer" } }, "required": ["id"] },
+                "Tagged": { "type": "object", "properties": { "id": { "type": "integer" }, "tag": { "type": "string" } }, "required": ["id"] }
+            }
+        },
+        "tests": [
+            { "description": "both take it", "data": { "id": 1 }, "valid": true, "failures": [] },
+            { "description": "only the second takes it", "data": { "id": 1, "tag": "x" }, "valid": true, "failures": [] }
+        ]
+    },
+    {
+        "description": "anyOf over three models, one inline, checks a nested field in its variant",
+        "schema": {
+            "$ref": "#/$defs/Pick",
+            "$defs": {
+                "Pick": {
+                    "title": "a pick",
+                    "anyOf": [
+                        { "$ref": "#/$defs/A" },
+                        { "type": "object", "properties": { "inner": { "type": "object", "properties": { "n": { "type": "integer", "maximum": 5 } }, "required": ["n"] } }, "required": ["inner"] },
+                        { "$ref": "#/$defs/C" }
+                    ]
+                },
+                "A": { "type": "object", "properties": { "a": { "type": "integer" } }, "required": ["a"] },
+                "C": { "type": "object", "properties": { "c": { "type": "boolean" } }, "required": ["c"] }
+            }
+        },
+        "tests": [
+            { "description": "the first", "data": { "a": 1 }, "valid": true, "failures": [] },
+            { "description": "the inline one", "data": { "inner": { "n": 5 } }, "valid": true, "failures": [] },
+            { "description": "the inline one fails below", "data": { "inner": { "n": 6 } }, "valid": false, "failures": ["Value.value.inner.n: range"] },
+            { "description": "the third", "data": { "c": true }, "valid": true, "failures": [] }
+        ]
+    },
+    {
+        "description": "a union field of a model beside other fields",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "pick": { "$ref": "#/$defs/Pick" }
+            },
+            "required": ["pick"],
+            "$defs": {
+                "Pick": { "anyOf": [{ "$ref": "#/$defs/A" }, { "$ref": "#/$defs/B" }] },
+                "A": { "type": "object", "properties": { "a": { "type": "integer", "minimum": 0 } }, "required": ["a"] },
+                "B": { "type": "object", "properties": { "b": { "type": "string" } }, "required": ["b"] }
+            }
+        },
+        "tests": [
+            { "description": "the second", "data": { "name": "n", "pick": { "b": "x" } }, "valid": true, "failures": [] },
+            { "description": "the first fails its check", "data": { "pick": { "a": -2 } }, "valid": false, "failures": ["Value.pick.a: range"] }
+        ]
+    },
+    {
+        "description": "anyOf over a constant and a list is a union of text and a list",
+        "schema": {
+            "$ref": "#/$defs/On",
+            "$defs": { "On": { "anyOf": [{ "const": "any" }, { "type": "array", "items": { "type": "string" } }] } }
+        },
+        "tests": [
+            { "description": "the constant", "data": "any", "valid": true, "failures": [] },
+            { "description": "text no branch holds", "data": "some", "valid": false, "failures": ["Value.value: range"] },
+            { "description": "a list", "data": ["a", "b"], "valid": true, "failures": [] },
+            { "description": "an empty list", "data": [], "valid": true, "failures": [] },
+            { "description": "of another kind", "data": 1, "valid": false }
+        ]
+    },
+    {
+        "description": "anyOf over a model, an integer, and a nullable text",
+        "schema": {
+            "$ref": "#/$defs/Mixed",
+            "$defs": {
+                "Mixed": { "anyOf": [{ "$ref": "#/$defs/A" }, { "type": "integer", "minimum": 0 }, { "type": ["string", "null"], "maxLength": 3 }] },
+                "A": { "type": "object", "properties": { "a": { "type": "integer" } }, "required": ["a"] }
+            }
+        },
+        "tests": [
+            { "description": "the model", "data": { "a": 1 }, "valid": true, "failures": [] },
+            { "description": "the integer", "data": 4, "valid": true, "failures": [] },
+            { "description": "text", "data": "abc", "valid": true, "failures": [] },
+            { "description": "null", "data": null, "valid": true, "failures": [] },
+            { "description": "text too long", "data": "abcd", "valid": false, "failures": ["Value.value: range"] }
+        ]
+    },
+    {
+        "description": "a later branch accepts a value the first branch's check fails",
+        "schema": {
+            "$ref": "#/$defs/Pick",
+            "$defs": {
+                "Pick": { "anyOf": [{ "$ref": "#/$defs/Low" }, { "$ref": "#/$defs/High" }, { "type": "string", "minLength": 2 }] },
+                "Low": { "type": "object", "properties": { "n": { "type": "integer", "maximum": 5 } }, "required": ["n"] },
+                "High": { "type": "object", "properties": { "n": { "type": "integer", "minimum": 10 } }, "required": ["n"] }
+            }
+        },
+        "tests": [
+            { "description": "the first takes it", "data": { "n": 3 }, "valid": true, "failures": [] },
+            { "description": "the second takes it where the first's check fails", "data": { "n": 12 }, "valid": true, "failures": [] },
+            { "description": "neither takes it: the first reports", "data": { "n": 7 }, "valid": false, "failures": ["Value.value.n: range"] },
+            { "description": "a branch that isn't a model takes it", "data": "ab", "valid": true, "failures": [] },
+            { "description": "that branch's check fails", "data": "a", "valid": false, "failures": ["Value.value: range"] }
+        ]
+    },
+    {
+        "description": "anyOf over plain types with bounds takes the first branch whose check passes",
+        "schema": {
+            "$ref": "#/$defs/Pick",
+            "$defs": {
+                "Pick": { "anyOf": [{ "type": "integer", "maximum": 5 }, { "type": "integer", "minimum": 10 }] }
+            }
+        },
+        "tests": [
+            { "description": "the first takes it", "data": 3, "valid": true, "failures": [] },
+            { "description": "the second takes it where the first's check fails", "data": 12, "valid": true, "failures": [] },
+            { "description": "neither takes it", "data": 7, "valid": false, "failures": ["Value.value: range"] }
+        ]
+    },
+    {
+        "description": "oneOf over object models is refused",
+        "schema": {
+            "$ref": "#/$defs/Pick",
+            "$defs": {
+                "Pick": { "oneOf": [{ "$ref": "#/$defs/A" }, { "$ref": "#/$defs/B" }] },
+                "A": { "type": "object", "properties": { "a": { "type": "integer" } }, "required": ["a"] },
+                "B": { "type": "object", "properties": { "b": { "type": "string" } }, "required": ["b"] }
+            }
+        },
+        "tests": [
+            { "description": "fits the first", "data": { "a": 1 }, "valid": true, "failures": [] }
+        ]
+    }
+]

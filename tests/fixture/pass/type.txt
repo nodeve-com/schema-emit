@@ -1,0 +1,57 @@
+array type matches arrays/an array is an array
+boolean type matches booleans/a float is not a boolean
+boolean type matches booleans/a string is not a boolean
+boolean type matches booleans/an array is not a boolean
+boolean type matches booleans/an empty string is not a boolean
+boolean type matches booleans/an integer is not a boolean
+boolean type matches booleans/an object is not a boolean
+boolean type matches booleans/false is a boolean
+boolean type matches booleans/null is not a boolean
+boolean type matches booleans/true is a boolean
+boolean type matches booleans/zero is not a boolean
+integer type matches integers/a boolean is not an integer
+integer type matches integers/a float is not an integer
+integer type matches integers/a float with zero fractional part is an integer
+integer type matches integers/a string is not an integer
+integer type matches integers/a string is still not an integer, even if it looks like one
+integer type matches integers/an array is not an integer
+integer type matches integers/an integer is an integer
+integer type matches integers/an object is not an integer
+integer type matches integers/null is not an integer
+null type matches only the null object/a float is not null
+null type matches only the null object/a string is not null
+null type matches only the null object/an array is not null
+null type matches only the null object/an empty string is not null
+null type matches only the null object/an integer is not null
+null type matches only the null object/an object is not null
+null type matches only the null object/false is not null
+null type matches only the null object/null is null
+null type matches only the null object/true is not null
+null type matches only the null object/zero is not null
+number type matches numbers/a boolean is not a number
+number type matches numbers/a float is a number
+number type matches numbers/a float with zero fractional part is a number (and an integer)
+number type matches numbers/a string is not a number
+number type matches numbers/a string is still not a number, even if it looks like one
+number type matches numbers/an array is not a number
+number type matches numbers/an integer is a number
+number type matches numbers/an object is not a number
+number type matches numbers/null is not a number
+object type matches objects/a boolean is not an object
+object type matches objects/a float is not an object
+object type matches objects/a string is not an object
+object type matches objects/an array is not an object
+object type matches objects/an integer is not an object
+object type matches objects/an object is an object
+object type matches objects/null is not an object
+string type matches strings/1 is not a string
+string type matches strings/a boolean is not a string
+string type matches strings/a float is not a string
+string type matches strings/a string is a string
+string type matches strings/a string is still a string, even if it looks like a number
+string type matches strings/an array is not a string
+string type matches strings/an empty string is still a string
+string type matches strings/an object is not a string
+string type matches strings/null is not a string
+type as array with one item/number is invalid
+type as array with one item/string is valid

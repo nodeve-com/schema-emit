@@ -1,0 +1,28 @@
+Evaluated properties collection needs to consider instance location with additionalProperties/with only the nested evaluated property
+Evaluated properties collection needs to consider instance location with patternProperties/with only the nested evaluated property
+cousin unevaluatedProperties, true and false, false with properties/with no nested unevaluated properties
+cousin unevaluatedProperties, true and false, true with properties/with no nested unevaluated properties
+in-place applicator siblings, allOf has unevaluated/in place applicator siblings, bar is missing
+nested unevaluatedProperties, outer false, inner true, properties inside/with no nested unevaluated properties
+nested unevaluatedProperties, outer false, inner true, properties outside/with no nested unevaluated properties
+nested unevaluatedProperties, outer true, inner false, properties inside/with no nested unevaluated properties
+nested unevaluatedProperties, outer true, inner false, properties outside/with no nested unevaluated properties
+non-object instances are valid/ignores arrays
+non-object instances are valid/ignores booleans
+non-object instances are valid/ignores floats
+non-object instances are valid/ignores integers
+non-object instances are valid/ignores null
+non-object instances are valid/ignores strings
+unevaluatedProperties can't see inside cousins (reverse order)/always fails
+unevaluatedProperties can't see inside cousins/always fails
+unevaluatedProperties false/with no unevaluated properties
+unevaluatedProperties true/with no unevaluated properties
+unevaluatedProperties true/with unevaluated properties
+unevaluatedProperties with adjacent bool additionalProperties/with no additional properties
+unevaluatedProperties with adjacent non-bool additionalProperties/with no additional properties
+unevaluatedProperties with adjacent properties/with no unevaluated properties
+unevaluatedProperties with boolean schemas/with no unevaluated properties
+unevaluatedProperties with nested additionalProperties/with no additional properties
+unevaluatedProperties with nested properties/with no additional properties
+unevaluatedProperties with nested unevaluatedProperties/with nested unevaluated properties
+unevaluatedProperties with nested unevaluatedProperties/with no nested unevaluated properties

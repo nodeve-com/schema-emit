@@ -1,0 +1,76 @@
+[
+    {
+        "description": "bytes by contentEncoding base64",
+        "schema": { "type": "string", "contentEncoding": "base64" },
+        "tests": [
+            { "description": "padded standard base64", "data": "aGVsbG8=", "valid": true },
+            { "description": "the empty string", "data": "", "valid": true },
+            { "description": "a character outside the alphabet", "data": "aGVs%G8=", "valid": false },
+            { "description": "padding missing", "data": "aGVsbG8", "valid": false }
+        ]
+    },
+    {
+        "description": "other content encodings stay text",
+        "schema": { "type": "string", "contentEncoding": "base16" },
+        "tests": [
+            { "description": "any text", "data": "%%", "valid": true }
+        ]
+    },
+    {
+        "description": "a timestamp by format date-time",
+        "schema": { "type": "string", "format": "date-time" },
+        "tests": [
+            { "description": "an RFC 3339 instant", "data": "2026-10-11T16:33:00Z", "valid": true },
+            { "description": "with an offset and a fraction", "data": "2026-10-11T16:33:00.5+02:00", "valid": true },
+            { "description": "a date alone", "data": "2026-10-11", "valid": false }
+        ]
+    },
+    {
+        "description": "a duration by format duration",
+        "schema": { "type": "string", "format": "duration" },
+        "tests": [
+            { "description": "ISO 8601", "data": "P1DT2H", "valid": true },
+            { "description": "seconds as CEL writes them", "data": "1.5s", "valid": false },
+            { "description": "a unit without a number", "data": "PT", "valid": false }
+        ]
+    },
+    {
+        "description": "a duration by format human-duration",
+        "schema": { "type": "string", "format": "human-duration" },
+        "tests": [
+            { "description": "seconds as CEL writes them", "data": "1.5s", "valid": true },
+            { "description": "ISO 8601", "data": "P1D", "valid": false }
+        ]
+    },
+    {
+        "description": "uniqueItems of timestamps",
+        "schema": { "type": "array", "uniqueItems": true, "items": { "type": "string", "format": "date-time" } },
+        "tests": [
+            { "description": "two instants", "data": ["2026-10-11T16:33:00Z", "2026-10-11T16:33:01Z"], "valid": true },
+            { "description": "one instant twice", "data": ["2026-10-11T16:33:00Z", "2026-10-11T16:33:00Z"], "valid": false }
+        ]
+    },
+    {
+        "description": "uniqueItems of durations",
+        "schema": { "type": "array", "uniqueItems": true, "items": { "type": "string", "format": "human-duration" } },
+        "tests": [
+            { "description": "two spans", "data": ["1s", "2s"], "valid": true },
+            { "description": "one span twice", "data": ["1s", "1s"], "valid": false }
+        ]
+    },
+    {
+        "description": "uniqueItems of bytes",
+        "schema": { "type": "array", "uniqueItems": true, "items": { "type": "string", "contentEncoding": "base64" } },
+        "tests": [
+            { "description": "two byte strings", "data": ["aGk=", "aGVsbG8="], "valid": true },
+            { "description": "one byte string twice", "data": ["aGk=", "aGk="], "valid": false }
+        ]
+    },
+    {
+        "description": "other text formats stay annotations",
+        "schema": { "type": "string", "format": "email" },
+        "tests": [
+            { "description": "not an email", "data": "nope", "valid": true }
+        ]
+    }
+]
