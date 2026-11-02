@@ -142,3 +142,17 @@ fn a_union_named_as_a_model_keeps_its_branches_name() {
         "{items}"
     );
 }
+
+#[test]
+fn an_open_model_skips_the_keys_no_field_names() {
+    let closes = |extra: &[(&str, serde_json::Value)]| {
+        let mut schema = json!({"type": "object", "properties": {"a": {"type": "string"}}});
+        for (key, value) in extra {
+            schema[*key] = value.clone();
+        }
+        rooted(&schema).contains("decode::closed")
+    };
+    assert!(!closes(&[]));
+    assert!(closes(&[("additionalProperties", json!(false))]));
+    assert!(closes(&[("unevaluatedProperties", json!(false))]));
+}

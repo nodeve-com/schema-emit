@@ -4,9 +4,10 @@
 //! Each reader is an expression over `schema_emit_runtime::decode`'s, which put each step on the
 //! path of a failure inside them. A union decodes in `decode/union.rs`.
 //!
-//! A required field absent, and a key no field names on a model that holds no such keys, are
-//! refused. Every other key goes to the field of keys no field names, each value read as that
-//! field's type. A field whose type holds its own model is boxed, as the struct has it.
+//! A required field absent, and a key no field names on a closed model, are refused. An open
+//! model that holds no such keys skips them unread. Every other key goes to the field of keys no
+//! field names, each value read as that field's type. A field whose type holds its own model is
+//! boxed, as the struct has it.
 
 use std::fmt::Write as _;
 
@@ -97,8 +98,8 @@ impl StdForm<'_> {
             format!("{}(o, {keys}, |x0| {read})?", d("rest"))
         });
         let tail = match rest {
-            Some(_) => String::new(),
-            None => format!("{}(o, {keys})?; ", d("closed")),
+            None if !m.open => format!("{}(o, {keys})?; ", d("closed")),
+            _ => String::new(),
         };
         init.push_str(&others(rest.unwrap_or_default()));
         (format!("let o = {}(v)?; ", d("object")), init, tail)

@@ -23,6 +23,8 @@ pub struct Model {
     /// where none does: the model is closed, or nothing judges those keys. `Base::Any` is for
     /// values no check reads.
     pub others: Option<Ty>,
+    /// Whether the object may hold keys no field names and nothing reads. A decode skips them.
+    pub open: bool,
 }
 
 impl Model {

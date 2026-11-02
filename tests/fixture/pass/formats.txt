@@ -1,8 +1,8 @@
-a duration by format human-duration/ISO 8601
-a duration by format human-duration/seconds as CEL writes them
 a duration by format duration/ISO 8601
 a duration by format duration/a unit without a number
 a duration by format duration/seconds as CEL writes them
+a duration by format human-duration/ISO 8601
+a duration by format human-duration/seconds as CEL writes them
 a timestamp by format date-time/a date alone
 a timestamp by format date-time/an RFC 3339 instant
 a timestamp by format date-time/with an offset and a fraction

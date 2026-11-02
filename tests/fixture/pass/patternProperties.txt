@@ -15,5 +15,7 @@ patternProperties with boolean schemas/object with both properties is invalid
 patternProperties with boolean schemas/object with property matching schema false is invalid
 patternProperties with boolean schemas/object with property matching schema true is valid
 patternProperties with null valued instance properties/allows null values
+regexes are not anchored by default and are case sensitive/non recognized members are ignored
 regexes are not anchored by default and are case sensitive/recognized members are accounted for
+regexes are not anchored by default and are case sensitive/regexes are case sensitive
 regexes are not anchored by default and are case sensitive/regexes are case sensitive, 2

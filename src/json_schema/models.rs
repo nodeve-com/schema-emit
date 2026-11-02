@@ -113,6 +113,7 @@ pub(super) fn base(lower: &mut Lower, name: &str, s: &Map<String, Value>) -> Res
             fields,
             checks: Vec::new(),
             others: needed(s, &props, &required).then(|| Ty::of(Base::Any)),
+            open: !closed(s) && s.get("unevaluatedProperties") != Some(&Value::Bool(false)),
         },
     );
     Ok(Base::Model(index))
