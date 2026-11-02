@@ -12,9 +12,11 @@ pub(super) fn view(base: &Base, value: &str, view: &str) -> String {
     }
 }
 
-/// What the base's width demands of `view`, if anything.
+/// What the base's width demands of `view`, if anything: an `i64` holds only what its width
+/// allows, so its width demands nothing.
 pub(super) fn width(base: &Base, view: &str) -> Option<String> {
     match base {
+        Base::Int(Int::I64) => None,
         Base::Int(w) => Some(int(*w, view)),
         Base::Float(Float::F64) => Some(format!("{view}.is_finite()")),
         Base::Float(Float::F32) => Some(format!(

@@ -184,6 +184,9 @@ impl Emitter<'_> {
                 let view = at.local("n");
                 let bind = scalars::view(&ty.base, value, &view);
                 let conds = self.conds(&ty.base, &ty.checks, &view)?;
+                if conds.is_empty() {
+                    return Ok(String::new());
+                }
                 Ok(format!("{{ {bind}\n{}}}\n", guard(at, &conds)))
             }
         }
