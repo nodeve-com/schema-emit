@@ -166,6 +166,7 @@ dependencies = [
  "chrono",
  "humantime",
  "pattern-emit",
+ "serde",
  "serde_json",
 ]
 

@@ -1,6 +1,6 @@
 [package]
 name = "schema-emit"
-description = "JSON Schema to Rust: types, readers of a parsed JSON value, and checks over typed values, linking schema-emit-runtime."
+description = "JSON Schema to Rust: types, decoders of JSON text, and checks over typed values, linking schema-emit-runtime."
 version = "0.6.2"
 edition = "2021"
 license = "MPL-2.0"

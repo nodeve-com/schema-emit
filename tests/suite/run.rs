@@ -41,12 +41,12 @@ pub fn module(n: usize, case: &Case) -> Result<String, Error> {
     let check = Emitter::new(&case.schema, &std).check(case.model, "check")?;
     Ok(format!(
         "mod c{n} {{ #![allow(unused_imports, clippy::all)] use ::schema_emit_runtime as s;\n{}{check}\
-         pub fn run() -> super::Outcome {{ let json = ::serde_json::from_str({:?}).unwrap_or_default(); \
-         match decode_m{}(&json) {{ Ok(v) => {{ let mut f = s::Failures::<16>::default(); \
+         pub fn run() -> super::Outcome {{ \
+         match decode_m{}({:?}) {{ Ok(v) => {{ let mut f = s::Failures::<16>::default(); \
          check(&v, &mut f); super::outcome(&f) }} Err(e) => super::refused(&e) }} }} }}\n",
         std.items()?,
-        case.json,
-        case.model
+        case.model,
+        case.json
     ))
 }
 

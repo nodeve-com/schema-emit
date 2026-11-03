@@ -17,12 +17,14 @@ fn_params_excessive_bools = "deny"
 too_many_lines = "warn"
 
 [features]
-# Decoding a `serde_json::Value` into the std form: the one part that needs an allocator.
-decode = ["dep:serde_json", "dep:chrono", "dep:humantime", "dep:base64"]
+# Decoding JSON text into the std form: the one part that needs an allocator.
+decode = ["dep:serde", "dep:serde_json", "dep:chrono", "dep:humantime", "dep:base64"]
 
 [dependencies]
 # Search only: a pattern check walks a table that schema-emit built.
 pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "1acab6a86e146143e8ab2ba5bde2dada963df88c", version = "0.6.2" }
+# serde_json's reader walks the text; a structure's parts come back as their own text.
+serde = { version = "1", optional = true }
 serde_json = { version = "1", features = ["preserve_order", "raw_value"], optional = true }
 # The reader of `human-duration` text: an optional sign, then humantime's text.
 humantime = { version = "2", optional = true }

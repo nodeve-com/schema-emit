@@ -1,19 +1,22 @@
-//! What the decode functions that schema-emit writes link (feature `decode`): readers of one
-//! JSON value as a std value of one kind, and [`Unfit`], which says where a value fails to decode
-//! and why. The structured readers (list, map, tuple, model fields) are in `shapes`; each adds
-//! its step to the path of a failure inside it.
+//! What the decode functions that schema-emit writes link (feature `decode`): readers of one JSON
+//! value's text as a std value of one kind, and [`Unfit`], which says where a value fails to
+//! decode and why. The structured readers (list, map, tuple, model fields) are in `shapes`; each
+//! adds its step to the path of a failure inside it. `walk` reads the text.
 
+use std::borrow::Cow;
 use std::fmt;
 use std::string::String;
 use std::vec::Vec;
 
 use base64::Engine as _;
 use chrono::{DateTime, TimeDelta, Timelike, Utc};
-use serde_json::{Map, Number, Value};
+use serde_json::{Number, Value};
 
 mod shapes;
+mod walk;
 
 pub use shapes::*;
+use walk::{first, parse, string};
 
 /// Why a value has no std form.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -116,36 +119,55 @@ impl fmt::Display for Unfit {
 
 impl std::error::Error for Unfit {}
 
-pub fn null(v: &Value) -> Result<(), Unfit> {
-    v.is_null().then_some(()).ok_or(Unfit::kind("null"))
+pub fn null(v: &str) -> Result<(), Unfit> {
+    match first(v) {
+        Some(b'n') => parse(v),
+        _ => Err(Unfit::kind("null")),
+    }
 }
 
-pub fn boolean(v: &Value) -> Result<bool, Unfit> {
-    v.as_bool().ok_or(Unfit::kind("a boolean"))
+pub fn boolean(v: &str) -> Result<bool, Unfit> {
+    match first(v) {
+        Some(b't' | b'f') => parse(v),
+        _ => Err(Unfit::kind("a boolean")),
+    }
 }
 
-pub fn text(v: &Value) -> Result<String, Unfit> {
-    v.as_str().map(String::from).ok_or(Unfit::kind("text"))
+pub fn text(v: &str) -> Result<String, Unfit> {
+    string(v, "text").map(Cow::into_owned)
 }
 
-pub fn float(v: &Value) -> Result<f64, Unfit> {
-    let n = v.as_number().ok_or(Unfit::kind("a number"))?;
+/// A value of any kind, as serde_json holds one.
+pub fn any(v: &str) -> Result<Value, Unfit> {
+    parse(v)
+}
+
+/// A JSON number, or `expected` where `v` holds another kind.
+fn number(v: &str, expected: &'static str) -> Result<Number, Unfit> {
+    match first(v) {
+        Some(b'-' | b'0'..=b'9') => parse(v),
+        _ => Err(Unfit::kind(expected)),
+    }
+}
+
+pub fn float(v: &str) -> Result<f64, Unfit> {
+    let n = number(v, "a number")?;
     n.as_f64().ok_or(Unfit::other("a number no f64 holds"))
 }
 
-pub fn int(v: &Value) -> Result<i64, Unfit> {
+pub fn int(v: &str) -> Result<i64, Unfit> {
     let whole = whole(v)?;
     i64::try_from(whole).map_err(|_| Unfit::other("an integer past 64 bits"))
 }
 
-pub fn uint(v: &Value) -> Result<u64, Unfit> {
+pub fn uint(v: &str) -> Result<u64, Unfit> {
     let whole = whole(v)?;
     u64::try_from(whole).map_err(|_| Unfit::other("an integer past 64 bits"))
 }
 
 /// A whole number, which may be written as a float, such as `1.0`.
-fn whole(v: &Value) -> Result<i128, Unfit> {
-    let n: &Number = v.as_number().ok_or(Unfit::kind("an integer"))?;
+fn whole(v: &str) -> Result<i128, Unfit> {
+    let n = number(v, "an integer")?;
     if let Some(i) = n.as_i64() {
         return Ok(i128::from(i));
     }
@@ -162,9 +184,9 @@ fn whole(v: &Value) -> Result<i128, Unfit> {
 
 /// RFC 3339 `date-time`, at UTC. A leap second reads as the next second, and a `:60` outside
 /// 23:59 UTC fails.
-pub fn timestamp(v: &Value) -> Result<DateTime<Utc>, Unfit> {
+pub fn timestamp(v: &str) -> Result<DateTime<Utc>, Unfit> {
     let text = string(v, "an RFC 3339 timestamp")?;
-    let at = DateTime::parse_from_rfc3339(text)
+    let at = DateTime::parse_from_rfc3339(&text)
         .map_err(|_| Unfit::kind("an RFC 3339 timestamp"))?
         .with_timezone(&Utc);
     let (seconds, nanos) = (at.timestamp(), at.timestamp_subsec_nanos());
@@ -179,12 +201,12 @@ pub fn timestamp(v: &Value) -> Result<DateTime<Utc>, Unfit> {
 /// A duration, `format: human-duration`: an optional sign, then `humantime`'s text (`1.5s`,
 /// `90m`).
 #[allow(clippy::disallowed_methods)]
-pub fn duration(v: &Value) -> Result<TimeDelta, Unfit> {
+pub fn duration(v: &str) -> Result<TimeDelta, Unfit> {
     let text = string(v, "a duration")?;
     let (negative, unsigned) = match text.as_bytes().first() {
         Some(b'-') => (true, text.get(1..).unwrap_or_default()),
         Some(b'+') => (false, text.get(1..).unwrap_or_default()),
-        _ => (false, text),
+        _ => (false, &*text),
     };
     let span = humantime::parse_duration(unsigned).map_err(|_| Unfit::kind("a duration"))?;
     let delta = TimeDelta::from_std(span).map_err(|_| Unfit::other(PAST_RANGE))?;
@@ -199,24 +221,10 @@ pub fn duration(v: &Value) -> Result<TimeDelta, Unfit> {
 const PAST_RANGE: &str = "an instant or span past the range";
 
 /// Padded base64 of the standard alphabet.
-pub fn bytes(v: &Value) -> Result<Vec<u8>, Unfit> {
+pub fn bytes(v: &str) -> Result<Vec<u8>, Unfit> {
     base64::engine::general_purpose::STANDARD
-        .decode(string(v, "padded base64")?)
+        .decode(&*string(v, "padded base64")?)
         .map_err(|_| Unfit::kind("padded base64"))
-}
-
-fn string<'a>(v: &'a Value, expected: &'static str) -> Result<&'a str, Unfit> {
-    v.as_str().ok_or(Unfit::kind(expected))
-}
-
-/// A JSON object's entries, for the readers of models and maps.
-pub fn object(v: &Value) -> Result<&Map<String, Value>, Unfit> {
-    v.as_object().ok_or(Unfit::kind("an object"))
-}
-
-/// A JSON array's items.
-pub fn array(v: &Value) -> Result<&Vec<Value>, Unfit> {
-    v.as_array().ok_or(Unfit::kind("an array"))
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@
 //! field whose type holds its own model is boxed, no other. A value of any kind is a
 //! `serde_json::Value`, a null a `()`. A union is an enum, a variant per branch
 //! (`std_form/unions.rs`). [`StdForm`] is the [`Access`] to it, and writes beside each struct the
-//! function decoding a `serde_json::Value` into it (`std_form/decode.rs`).
+//! function decoding JSON text into it (`std_form/decode.rs`).
 
 use std::fmt::Write as _;
 

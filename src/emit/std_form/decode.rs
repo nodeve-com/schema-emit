@@ -1,13 +1,14 @@
-//! Functions decoding a `serde_json::Value` into the std types. A model's is `decode_<name>`,
-//! which names the model at the root of a path that says where a value doesn't fit; each also has
-//! a `read_<name>` of the value without that root, which the union and the model around it call.
-//! Each reader is an expression over `schema_emit_runtime::decode`'s, which put each step on the
-//! path of a failure inside them. A union decodes in `decode/union.rs`.
+//! Functions decoding JSON text into the std types. A model's is `decode_<name>`, which refuses
+//! text nested too deep and names the model at the root of a path that says where a value doesn't
+//! fit; each also has a `read_<name>` of one value's text without that root, which the union and
+//! the model around it call. Each reader is an expression over `schema_emit_runtime::decode`'s,
+//! which put each step on the path of a failure inside them. A union decodes in `decode/union.rs`.
 //!
-//! A required field absent, and a key no field names on a closed model, are refused. An open
-//! model that holds no such keys skips them unread. Every other key goes to the field of keys no
-//! field names, each value read as that field's type. A field whose type holds its own model is
-//! boxed, as the struct has it.
+//! A model takes its fields' text from the object first, then reads each in turn. A required field
+//! absent, and a key no field names on a closed model, are refused. An open model that holds no
+//! such keys skips them unread. Every other key goes to the field of keys no field names, each
+//! value read as that field's type. A field whose type holds its own model is boxed, as the struct
+//! has it.
 
 use std::fmt::Write as _;
 
@@ -47,14 +48,15 @@ impl StdForm<'_> {
         let (name, id) = ((self.name)(i), self.decoder_id(i));
         let unfit = d("Unfit");
         let mut out = format!(
-            "#[allow(dead_code)] pub fn decode_{id}(v: &::serde_json::Value) \
-             -> Result<{name}, {unfit}> {{ read_{id}(v).map_err(|e| e.model({:?})) }}\n",
+            "#[allow(dead_code)] pub fn decode_{id}(v: &str) -> Result<{name}, {unfit}> {{ \
+             {}(v, {:?}, read_{id}) }}\n",
+            d("root"),
             m.name
         );
         let (head, init, tail) = self.model_body(i, m);
         let _ = writeln!(
             out,
-            "#[allow(dead_code, unused_variables)] pub fn read_{id}(v: &::serde_json::Value) \
+            "#[allow(dead_code, unused_variables)] pub fn read_{id}(v: &str) \
              -> Result<{name}, {unfit}> {{ {head}let out = {name} {{ {init}}}; {tail}Ok(out) }}"
         );
         out
@@ -74,22 +76,24 @@ impl StdForm<'_> {
         }
         let keys: Vec<String> = m.fields.iter().map(|f| format!("{:?}", f.name)).collect();
         let keys = format!("&[{}]", keys.join(", "));
-        let mut init = String::new();
-        for (f, n) in m.fields.iter().zip(&names.fields) {
+        let (mut init, mut slots) = (String::new(), Vec::new());
+        for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
             let read = self.dec(&f.ty, Some(i), 1);
             let how = if f.required { "field" } else { "optional" };
-            let _ = write!(init, "{n}: {}(o, {:?}, |x0| {read})?, ", d(how), f.name);
+            let _ = write!(init, "{n}: {}(f{k}, {:?}, |x0| {read})?, ", d(how), f.name);
+            slots.push(format!("f{k}"));
         }
         let rest = m.others.as_ref().map(|held| {
             let read = self.dec(held, None, 1);
-            format!("{}(o, {keys}, |x0| {read})?", d("rest"))
+            format!("{}(v, {keys}, |x0| {read})?", d("rest"))
         });
         let tail = match rest {
-            None if !m.open => format!("{}(o, {keys})?; ", d("closed")),
+            None if !m.open => format!("{}(v, {keys})?; ", d("closed")),
             _ => String::new(),
         };
         init.push_str(&others(rest.unwrap_or_default()));
-        (format!("let o = {}(v)?; ", d("object")), init, tail)
+        let head = format!("let [{}] = {}(v, {keys})?; ", slots.join(", "), d("object"));
+        (head, init, tail)
     }
 
     /// The fields of a model that is one value, each read from that value.
@@ -128,7 +132,7 @@ impl StdForm<'_> {
         };
         match &ty.base {
             Base::Null => read("null"),
-            Base::Any => format!("Ok::<_, {}>({v}.clone())", d("Unfit")),
+            Base::Any => read("any"),
             Base::Bool => read("boolean"),
             Base::Int(Int::U64) => read("uint"),
             Base::Int(_) => read("int"),
@@ -168,33 +172,30 @@ impl StdForm<'_> {
         let Base::Tuple { prefix, rest } = &ty.base else {
             return String::new();
         };
-        let (xs, x, next) = (
-            format!("xs{depth}"),
-            format!("x{depth}"),
-            depth.saturating_add(1),
-        );
-        let mut parts: Vec<String> = Vec::new();
+        let (v, x, next) = (bound(depth), format!("x{depth}"), depth.saturating_add(1));
+        let (mut parts, mut slots) = (Vec::new(), Vec::new());
         for (i, p) in prefix.iter().enumerate() {
             let read = self.dec(p, owner, next);
-            parts.push(format!("{}({xs}, {i}, |{x}| {read})?", d("element")));
+            parts.push(format!(
+                "{}(p{depth}_{i}, {i}, |{x}| {read})?",
+                d("element")
+            ));
+            slots.push(format!("p{depth}_{i}"));
         }
-        let mut fixed = String::new();
-        match rest {
+        let n = prefix.len();
+        let fixed = match rest {
             Some(item) => {
                 let read = self.dec(item, None, next);
-                parts.push(format!(
-                    "{}({xs}, {}, |{x}| {read})?",
-                    d("tail"),
-                    prefix.len()
-                ));
+                parts.push(format!("{}({v}, {n}, |{x}| {read})?", d("tail")));
+                String::new()
             }
-            None => fixed = format!("{}({xs}, {})?; ", d("fixed"), prefix.len()),
-        }
+            None => format!("{}({v}, {n})?; ", d("fixed")),
+        };
         format!(
-            "(|| -> Result<_, {}> {{ let {xs} = {}({})?.as_slice(); {fixed}Ok({}) }})()",
+            "(|| -> Result<_, {}> {{ let [{}] = {}::<{n}>({v})?; {fixed}Ok({}) }})()",
             d("Unfit"),
-            d("array"),
-            bound(depth),
+            slots.join(", "),
+            d("tuple"),
             tuple_of(&parts)
         )
     }

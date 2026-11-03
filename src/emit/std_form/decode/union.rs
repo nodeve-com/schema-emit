@@ -1,7 +1,8 @@
-//! A union decodes branch by branch, in order: the first that decodes and whose check passes is
-//! the value. Where none passes its check, the first that decodes is, so its check reports why.
-//! Where none decodes, the failure is the branch's the value fit furthest (`Unfit::either`). The check
-//! is the union's own, over its enum (`Emitter::check_union`), so a branch of any type has one.
+//! A union decodes branch by branch, in order, each from the same text: the first that decodes and
+//! whose check passes is the value. Where none passes its check, the first that decodes is, so its
+//! check reports why. Where none decodes, the failure is the branch's the value fit furthest
+//! (`Unfit::either`). The check is the union's own, over its enum (`Emitter::check_union`), so a
+//! branch of any type has one.
 
 use super::d;
 use crate::emit::{Emitter, STD};
@@ -30,7 +31,7 @@ impl StdForm<'_> {
             ));
         }
         out.push_str(&format!(
-            "#[allow(dead_code, unused_variables)] fn read_{id}(v: &::serde_json::Value) \
+            "#[allow(dead_code, unused_variables)] fn read_{id}(v: &str) \
              -> Result<{name}, {unfit}> {{ \
              let mut first: Option<{name}> = None; let mut why: Option<{unfit}> = None;\n{arms}\
              match first {{ Some(c) => Ok(c), \
