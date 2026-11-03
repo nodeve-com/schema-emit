@@ -89,21 +89,24 @@ fn module(n: usize, case: &Case) -> String {
     let derive = ["::serde::Deserialize"];
     let derived = StdForm::new(&case.schema, &name)
         .with_derive(&derive)
-        .types();
+        .types()
+        .replace("pub others: String", "#[serde(default)] pub others: String");
     let m = case.model;
+    let ty = name(m);
     format!(
-        "mod c{n} {{ pub mod e {{ {allow} use ::schema_emit_runtime as s; {emitted} }}\n\
+        "mod c{n} {{ pub mod e {{ {allow} use ::schema_emit_runtime as __s; {emitted} }}\n\
          pub mod d {{ {allow} {derived} }}\n\
          const TEXT: &str = {:?};\n\
-         fn derived(t: &str) -> Result<d::{}, ::serde_json::Error> {{ ::serde_json::from_str(t) }}\n\
+         fn decoded(t: &str) -> Result<e::{ty}, ::schema_emit_runtime::decode::Unfit> \
+         {{ ::schema_emit_runtime::decode::json(t, |d| e::decode_m{m}(d)).map(|r| r.0) }}\n\
+         fn derived(t: &str) -> Result<d::{ty}, ::serde_json::Error> {{ ::serde_json::from_str(t) }}\n\
          fn value(t: &str) -> Result<::serde_json::Value, ::serde_json::Error> \
          {{ ::serde_json::from_str(t) }}\n\
          pub fn run(kind: &str) -> super::Row {{ match kind {{\n\
-         \"decode\" => super::row(|| super::measured_decode(e::decode_m{m}, TEXT)),\n\
+         \"decode\" => super::row(|| super::measured_decode(decoded, TEXT)),\n\
          \"derive\" => super::row(|| super::measured_decode(derived, TEXT)),\n\
          _ => super::row(|| super::measured_decode(value, TEXT)) }} }} }}\n",
         case.text,
-        name(m),
     )
 }
 
@@ -219,7 +222,12 @@ fn each_decode_allocates_no_more_than_its_baseline() {
     let baseline: BTreeMap<String, usize> = read(&file)
         .lines()
         .filter_map(|l| l.split_once('\t'))
-        .map(|(c, n)| (c.to_string(), n.parse().unwrap()))
+        .map(|(c, n)| {
+            (
+                c.to_string(),
+                n.split('\t').next().unwrap().parse().unwrap(),
+            )
+        })
         .collect();
     let over = past(&lines, &baseline);
     assert!(

@@ -39,7 +39,10 @@ fn schema() -> serde_json::Value {
 fn a_definition_named_twice_is_one_struct() {
     let items = rooted(&schema());
     assert_eq!(items.matches("pub struct Part ").count(), 1, "{items}");
-    assert!(items.contains("pub b: Option<Vec<Part>>"), "{items}");
+    assert!(
+        items.contains("pub b: ::core::option::Option<::std::vec::Vec<Part>>"),
+        "{items}"
+    );
 }
 
 #[test]
@@ -53,9 +56,9 @@ fn an_external_model_is_read_through_its_module() {
         .items()
         .unwrap();
     assert!(!items.contains("pub struct Part "), "{items}");
-    assert!(!items.contains("fn read_part("), "{items}");
+    assert!(!items.contains("for Part "), "{items}");
     assert!(items.contains("pub a: ::other::Part"), "{items}");
-    assert!(items.contains("::other::read_part("), "{items}");
+    assert!(items.contains("of::<::other::Part>()"), "{items}");
 }
 
 #[test]
@@ -83,15 +86,16 @@ fn an_allof_over_a_definition_leaves_the_definition_as_it_is() {
     let (s, _) = schema_emit::json_schema::lower_defs(&schema, &Map::new(), &[]).unwrap();
     let items = items(&s);
     assert!(
-        items.contains("pub struct Fields { pub kind: String, }"),
+        items.contains("pub struct Fields { pub kind: ::std::string::String, pub others: ::std::string::String, }"),
         "{items}"
     );
     assert!(
-        items.contains("pub struct Plain { pub kind: String, }"),
+        items.contains("pub struct Plain { pub kind: ::std::string::String, pub others: ::std::string::String, }"),
         "{items}"
     );
     assert!(
-        items.contains("pub struct Named { pub kind: String, pub id: String, }"),
+        items
+            .contains("pub struct Named { pub kind: ::std::string::String, pub id: ::std::string::String, pub others: ::std::string::String, }"),
         "{items}"
     );
 }
@@ -113,11 +117,11 @@ fn a_union_takes_the_definition_naming_it() {
     });
     let items = rooted(&schema);
     assert!(
-        items.contains("pub enum Pick { Part(Part), String(String), }"),
+        items.contains("pub enum Pick { Part(Part), String(::std::string::String), }"),
         "{items}"
     );
     assert!(
-        items.contains("pub enum Part { Bool(bool), String(String), }"),
+        items.contains("pub enum Part { Bool(bool), String(::std::string::String), }"),
         "{items}"
     );
     assert!(items.contains("pub enum StringOrI64 "), "{items}");
@@ -125,7 +129,7 @@ fn a_union_takes_the_definition_naming_it() {
         items.contains("pub a: Pick, pub b: StringOrI64, pub c: Part,"),
         "{items}"
     );
-    assert!(items.contains("fn read_pick("), "{items}");
+    assert!(items.contains("for Pick "), "{items}");
 }
 
 #[test]
@@ -138,7 +142,9 @@ fn a_union_named_as_a_model_keeps_its_branches_name() {
     });
     let items = rooted(&schema);
     assert!(
-        items.contains("pub struct Root { pub root: BoolOrString, }"),
+        items.contains(
+            "pub struct Root { pub root: BoolOrString, pub others: ::std::string::String, }"
+        ),
         "{items}"
     );
 }
@@ -150,9 +156,37 @@ fn an_open_model_skips_the_keys_no_field_names() {
         for (key, value) in extra {
             schema[*key] = value.clone();
         }
-        rooted(&schema).contains("decode::unnamed")
+        rooted(&schema).contains("Parts::unnamed(")
     };
     assert!(!closes(&[]));
     assert!(closes(&[("additionalProperties", json!(false))]));
     assert!(closes(&[("unevaluatedProperties", json!(false))]));
+}
+
+#[test]
+fn an_embedder_reads_the_names_the_emitted_code_uses() {
+    let (s, _) = lower("Root", &schema(), &Map::new(), &[]).unwrap();
+    let clash = |_: usize| "Foo_bar".to_string();
+    let form = StdForm::new(&s, &clash);
+    let items = form.items().unwrap();
+    let count = s.models.len();
+    assert!(count >= 2, "{count}");
+    let mut seen = Vec::new();
+    for i in 0..count {
+        let (name, decoder) = (form.model_name(i), form.decoder(i));
+        assert!(
+            items.contains(&format!("pub struct {name} ")),
+            "{name}: {items}"
+        );
+        assert!(
+            items.contains(&format!("pub fn {decoder}<")),
+            "{decoder}: {items}"
+        );
+        assert!(!seen.contains(&name) && !seen.contains(&decoder));
+        seen.push(name);
+        seen.push(decoder);
+    }
+    assert_eq!(form.model_name(1), "Foo_bar_");
+    assert_eq!(form.decoder(0), "decode_foo_bar");
+    assert_eq!(form.decoder(1), "decode_foo_bar_");
 }

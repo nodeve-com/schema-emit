@@ -250,7 +250,7 @@ impl Walk<'_, '_> {
         };
         let function = format!(
             "#[allow(unused_variables, unused_mut, unused_parens, clippy::all)]\n\
-             pub fn {name}<R: {STD}::Report>(v: &{rust}, r: &mut R, pre: &{STD}::Trail, \
+             pub fn {name}<__R: {STD}::Report>(v: &{rust}, r: &mut __R, pre: &{STD}::Trail, \
              reps: &{STD}::Trail, n: u32) {{\n{body}}}\n"
         );
         e.register(&mark, kept, &function);

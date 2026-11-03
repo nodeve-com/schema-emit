@@ -1,1 +1,1 @@
-{"type": "object", "properties": {"big": {"type": "integer"}, "small": {"type": "integer", "format": "uint8"}}, "required": ["big", "small"]}
+{"type": "object", "properties": {"big": {"type": "integer", "format": "int128"}, "huge": {"type": "integer", "format": "uint128"}, "small": {"type": "integer", "format": "uint8"}}, "required": ["big", "huge", "small"]}

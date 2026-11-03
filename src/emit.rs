@@ -34,9 +34,9 @@ use crate::Error;
 use at::At;
 use walk::Walk;
 
-/// The runtime crate, as the emitted code names it: the embedder writes `use ::schema_emit_runtime as
-/// s;` beside it.
-pub const STD: &str = "s";
+/// The runtime crate, as the emitted code names it, under a name no model takes: the embedder
+/// writes `use ::schema_emit_runtime as __s;` beside it.
+pub const STD: &str = "__s";
 
 /// How the embedder's values read, each method a Rust expression.
 pub trait Access {
@@ -115,7 +115,7 @@ impl<'a> Emitter<'a> {
             let (m, rust) = self.parts(model)?;
             if let Some(call) = Walk::new(self, &m.name).marked("v", model)? {
                 return Ok(format!(
-                    "pub fn {name}<R: {STD}::Report>(v: &{rust}, r: &mut R) {{\n{call}}}\n"
+                    "pub fn {name}<__R: {STD}::Report>(v: &{rust}, r: &mut __R) {{\n{call}}}\n"
                 ));
             }
         }

@@ -1,14 +1,14 @@
 absent_optional	0
 array_of_models	5
-bad_optional	7
+bad_optional	11	a failing field returns serde_json's boxed error through each level; only a failing record pays it
 depth	251
 escaped_strings	4
 nested	1
 nullable	0
-open_model	0
+open_model	2	unread keys are kept as text: one allocation for it, one more inside the reader
 optional	1
 optional_nullable	1
 timestamp	0
-union	2
+union	5	a failing branch's error is serde_json's, which boxes it; the open first branch keeps its unread key
 wide_integers	0
 widths	0

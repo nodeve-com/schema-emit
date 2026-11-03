@@ -149,10 +149,12 @@ fn int_meet(name: &str, a: Int, b: Int) -> Result<Int, Error> {
         Int::I16,
         Int::I32,
         Int::I64,
+        Int::I128,
         Int::U8,
         Int::U16,
         Int::U32,
         Int::U64,
+        Int::U128,
     ]
     .into_iter()
     .find(|w| w.bounds() == (lo, hi))

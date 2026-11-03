@@ -1,33 +1,39 @@
 //! Values as standard Rust, for use anywhere: a model a struct the embedder names, its fields
 //! named from the schema. A required field is `T`, an optional one `Option<T>`; a
-//! nullable type is an `Option` too. An integer is `i64` whatever its width but `uint64`'s `u64`,
-//! a float `f64`; text `String`, bytes `Vec<u8>`, a timestamp `chrono::DateTime<chrono::Utc>`, a
-//! duration `chrono::TimeDelta`; a list `Vec`; keys no field names a `BTreeMap<String, _>`. A
-//! field whose type holds its own model is boxed, no other. A value of any kind is a
-//! `serde_json::Value`, a null a `()`. A union is an enum, a variant per branch
-//! (`std_form/unions.rs`). [`StdForm`] is the [`Access`] to it, and writes beside each struct the
-//! function decoding JSON text into it (`std_form/decode.rs`).
+//! nullable type is an `Option` too. A number keeps its width: an integer is the Rust integer of
+//! its name, a float `f32` or `f64`; text `String`, bytes `Vec<u8>`, a timestamp
+//! `chrono::DateTime<chrono::Utc>`, a duration `chrono::TimeDelta`; a list `Vec`; keys no field
+//! names, and a map, a `Vec<(String, _)>` of pairs. A field whose type holds its own model is boxed, no other. A
+//! value of any kind is a `serde_json::Value`, a null a `()`. A union is an enum, a variant per
+//! branch (`std_form/unions.rs`). [`StdForm`] is the [`Access`] to it, and writes beside each
+//! struct a serde `Deserialize` impl (`std_form/decode.rs`) and the function `decode_<name>`
+//! over it.
 
 use std::fmt::Write as _;
 
 use super::Access;
-use crate::ir::{Base, Int, Model, Schema, Ty, Union};
+use crate::ir::{Base, Float, Model, Schema, Ty, Union};
 use crate::Error;
 
 mod decode;
+mod derives;
+mod encode;
 mod idents;
+mod paths;
 mod source;
+mod types;
 mod unions;
 
 pub use idents::fields;
 pub use source::source;
+use types::{inline, rust_int, tuple_of};
 pub use unions::camel;
 
 /// The std form of `schema`'s models: model `i` is the struct `name(i)`.
 pub struct StdForm<'a> {
     pub schema: &'a Schema,
     pub name: &'a dyn Fn(usize) -> String,
-    /// The path of the module holding model `i`'s struct and `read_` function, where another
+    /// The path of the module holding model `i`'s struct and its `Deserialize` and `Serialize` impls, where another
     /// crate writes them; none is written here.
     pub external: &'a dyn Fn(usize) -> Option<String>,
     /// The paths of derive macros each struct and enum also derives, beyond `Debug`, `Clone`, and
@@ -74,7 +80,9 @@ impl Access for StdForm<'_> {
 
     fn other(&self, value: &str, model: usize, key: &str) -> Result<String, Error> {
         let field = self.others_field(model)?;
-        Ok(format!("{value}.{field}.get({key})"))
+        Ok(format!(
+            "{value}.{field}.iter().find(|(k, _)| k.as_str() == {key}).map(|(_, x)| x)"
+        ))
     }
 }
 
@@ -115,20 +123,6 @@ impl<'a> StdForm<'a> {
         StdForm { derive, ..self }
     }
 
-    /// The derive attribute of a struct or an enum.
-    fn derives(&self) -> String {
-        let extra: String = self.derive.iter().map(|d| format!(", {d}")).collect();
-        format!("#[derive(Debug, Clone, PartialEq{extra})]")
-    }
-
-    /// Model `m`'s struct, through its module where another crate writes it.
-    fn model_path(&self, m: usize) -> String {
-        match (self.external)(m) {
-            Some(module) => format!("{module}::{}", (self.name)(m)),
-            None => (self.name)(m),
-        }
-    }
-
     /// The Rust type of a value of `ty`, in model `owner` if it is a field's, which boxes a model
     /// that holds `owner`.
     fn ty(&self, ty: &Ty, owner: Option<usize>) -> String {
@@ -136,27 +130,29 @@ impl<'a> StdForm<'a> {
             Base::Null => "()".into(),
             Base::Any => "::serde_json::Value".into(),
             Base::Bool => "bool".into(),
-            Base::Int(Int::U64) => "u64".into(),
-            Base::Int(_) => "i64".into(),
-            Base::Float(_) => "f64".into(),
-            Base::Text => "String".into(),
+            Base::Int(w) => rust_int(*w).into(),
+            Base::Float(Float::F32) => "f32".into(),
+            Base::Float(Float::F64) => "f64".into(),
+            Base::Text => "::std::string::String".into(),
             Base::Timestamp => "::chrono::DateTime<::chrono::Utc>".into(),
             Base::Duration => "::chrono::TimeDelta".into(),
-            Base::Bytes => "Vec<u8>".into(),
-            Base::List(item) => format!("Vec<{}>", self.ty(item, None)),
+            Base::Bytes => "::std::vec::Vec<u8>".into(),
+            Base::List(item) => format!("::std::vec::Vec<{}>", self.ty(item, None)),
             Base::Tuple { prefix, rest } => self.tuple_ty(prefix, rest.as_deref(), owner),
             Base::Map(item) => format!(
-                "::std::collections::BTreeMap<String, {}>",
+                "::std::vec::Vec<(::std::string::String, {})>",
                 self.ty(item, None)
             ),
             Base::Union(u) => self.union_ty(u, owner),
             Base::Model(m) => match owner {
-                Some(o) if self.holds(*m, o) => format!("Box<{}>", self.model_path(*m)),
+                Some(o) if self.holds(*m, o) => {
+                    format!("::std::boxed::Box<{}>", self.model_path(*m))
+                }
                 _ => self.model_path(*m),
             },
         };
         if ty.nullable {
-            format!("Option<{base}>")
+            format!("::core::option::Option<{base}>")
         } else {
             base
         }
@@ -166,10 +162,10 @@ impl<'a> StdForm<'a> {
     fn tuple_ty(&self, prefix: &[Ty], rest: Option<&Ty>, owner: Option<usize>) -> String {
         let mut parts: Vec<String> = prefix
             .iter()
-            .map(|p| format!("Option<{}>", self.ty(p, owner)))
+            .map(|p| format!("::core::option::Option<{}>", self.ty(p, owner)))
             .collect();
         if let Some(r) = rest {
-            parts.push(format!("Vec<{}>", self.ty(r, None)));
+            parts.push(format!("::std::vec::Vec<{}>", self.ty(r, None)));
         }
         tuple_of(&parts)
     }
@@ -212,10 +208,11 @@ impl<'a> StdForm<'a> {
         Ok(idents::of(m.ok_or_else(|| Error::invalid(format!("no model {model}")))?).others)
     }
 
-    /// Each model's struct, and the function decoding a value into it.
+    /// Each model's struct, and the code decoding a value into it and encoding it.
     pub fn items(&self) -> Result<String, Error> {
         let mut out = self.structs();
         out.push_str(&self.decoders()?);
+        out.push_str(&self.encoders());
         Ok(out)
     }
 
@@ -235,8 +232,8 @@ impl<'a> StdForm<'a> {
             let _ = writeln!(
                 out,
                 "{} #[allow(dead_code)] pub struct {} {{ {}}}",
-                self.derives(),
-                (self.name)(i),
+                self.derives(self.defaults(i, &mut Vec::new())),
+                self.model_name(i),
                 self.struct_fields(i, m)
             );
         }
@@ -252,7 +249,7 @@ impl<'a> StdForm<'a> {
             let ty = if f.required {
                 ty
             } else {
-                format!("Option<{ty}>")
+                format!("::core::option::Option<{ty}>")
             };
             let _ = write!(fields, "pub {name}: {ty}, ");
         }
@@ -260,29 +257,13 @@ impl<'a> StdForm<'a> {
             let held = self.ty(held, None);
             let _ = write!(
                 fields,
-                "pub {}: ::std::collections::BTreeMap<String, {held}>, ",
+                "pub {}: ::std::vec::Vec<(::std::string::String, {held})>, ",
                 names.others
             );
+        } else if m.open {
+            let _ = write!(fields, "pub {}: ::std::string::String, ", names.others);
         }
         fields
-    }
-}
-
-/// The models a value of `ty` holds in its own size: its own, or a tuple's.
-fn inline(ty: &Ty) -> Vec<usize> {
-    match &ty.base {
-        Base::Model(m) => vec![*m],
-        Base::Union(u) => unions::models(&u.variants).collect(),
-        Base::Tuple { prefix, .. } => prefix.iter().flat_map(inline).collect(),
-        _ => Vec::new(),
-    }
-}
-
-/// A Rust tuple of `parts`, whose one part needs a comma to be a tuple.
-fn tuple_of(parts: &[String]) -> String {
-    match parts {
-        [one] => format!("({one},)"),
-        _ => format!("({})", parts.join(", ")),
     }
 }
 

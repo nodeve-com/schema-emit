@@ -17,17 +17,23 @@ fn_params_excessive_bools = "deny"
 too_many_lines = "warn"
 
 [features]
-# Decoding JSON text into the std form: the one part that needs an allocator.
+# Decoding into the std form and encoding it: the one part that needs an allocator.
 decode = ["dep:serde", "dep:serde_json", "dep:chrono", "dep:humantime", "dep:base64"]
 
 [dependencies]
 # Search only: a pattern check walks a table that schema-emit built.
 pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "1acab6a86e146143e8ab2ba5bde2dada963df88c", version = "0.6.2" }
-# serde_json reads each string, number and literal of the text in place.
+# The emitted `Deserialize` impls are serde's; serde_json reads the text, and hands a union's value over as a slice.
 serde = { version = "1", optional = true }
-serde_json = { version = "1", features = ["preserve_order"], optional = true }
+serde_json = { version = "1", features = ["preserve_order", "raw_value"], optional = true }
 # The reader of `human-duration` text: an optional sign, then humantime's text.
 humantime = { version = "2", optional = true }
 # A std value of a timestamp or a duration is a chrono type.
-chrono = { version = "0.4", default-features = false, optional = true }
+chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"], optional = true }
 base64 = { version = "0.22", features = ["std"], optional = true }
+
+[dev-dependencies]
+# A binary format, to test that one impl reads it.
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+# A YAML reader, to test that one impl reads it.
+serde-saphyr = "0.0.28"

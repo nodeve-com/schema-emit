@@ -58,7 +58,7 @@ impl<'a> Emitter<'a> {
         let body = Walk::new(self, path).present("v", ty)?;
         Ok(format!(
             "#[allow(unused_variables, unused_mut, unused_parens, unreachable_patterns, clippy::all)]\n\
-             pub fn {name}<R: {STD}::Report>(v: &{rust}, r: &mut R) {{\n{body}}}\n"
+             pub fn {name}<__R: {STD}::Report>(v: &{rust}, r: &mut __R) {{\n{body}}}\n"
         ))
     }
 
@@ -93,7 +93,7 @@ impl<'a> Emitter<'a> {
                 .collect();
             let _ = writeln!(
                 out,
-                "pub fn {name}_load() -> Result<(), {STD}::Unusable> {{ {} Ok(()) }}",
+                "pub fn {name}_load() -> ::core::result::Result<(), {STD}::Unusable> {{ {} Ok(()) }}",
                 loads.join(" ")
             );
         }

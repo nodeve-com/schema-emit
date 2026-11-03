@@ -1,232 +1,189 @@
-//! The readers of structured values: a list's items, a map's entries, a tuple's positions, a
-//! model's fields and the keys none names. Each reads its parts in text order through a reader
-//! the emitted code passes, and puts its own step on the path of a part that fails.
+//! The structured seeds: a list, a map, a nullable value, a boxed one, any value, and a type
+//! that deserializes itself. They compose, and the emitted code passes them as a field's seed.
 
-use std::collections::BTreeMap;
+use std::borrow::Cow;
+use std::boxed::Box;
+use std::fmt;
+use std::marker::PhantomData;
 use std::string::String;
 use std::vec::Vec;
 
-use serde::de::IgnoredAny;
-use serde_json::{Map, Value};
+use serde::de::{self, Deserialize, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
 
-use super::walk::{Parts, Reader};
-use super::{null, Unfit};
+use super::union::Text;
+use super::{binary, Kinds, Parts, Shape};
 
-/// The text `v` of a whole value of model `name`, read by `read`. Where the read fails, text that
-/// isn't one JSON value, or nests too deep, fails as that; a failure's path is led by `name`.
-pub fn root<'a, T>(
-    v: &'a str,
-    name: &str,
-    read: impl FnOnce(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<T, Unfit> {
-    let mut r = Reader::new(v);
-    let read = read(&mut r).and_then(|out| r.end().map(|()| out));
-    read.map_err(|e| {
-        let mut whole = Reader::new(v);
-        let broken = skip(&mut whole).and_then(|()| whole.end()).err();
-        broken.unwrap_or(e).model(name)
-    })
+/// A model's field names, and whether a key none of them is keeps its text.
+#[derive(Clone, Copy)]
+pub struct Names {
+    names: &'static [&'static str],
+    keep: bool,
 }
 
-/// The value here, read and dropped.
-pub fn skip(r: &mut Reader<'_>) -> Result<(), Unfit> {
-    match r.peek() {
-        Some(b'[') => list(r, skip).map(drop),
-        Some(b'{') => object(r, |_, r| skip(r)),
-        _ => r.token::<IgnoredAny>().map(drop),
+impl Names {
+    pub const fn new(names: &'static [&'static str], keep: bool) -> Names {
+        Names { names, keep }
     }
-}
 
-/// The value here, the reader moved past it: a reader of it, for each branch of a union.
-pub fn raw<'a>(r: &mut Reader<'a>) -> Result<Reader<'a>, Unfit> {
-    let at = r.clone();
-    skip(r)?;
-    Ok(at)
-}
-
-/// The value here read by `read`, or its failure with the reader moved past it. Fails where the
-/// text holds no value there.
-fn settle<'a, T>(
-    r: &mut Reader<'a>,
-    read: impl FnOnce(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<Result<T, Unfit>, Unfit> {
-    let at = r.clone();
-    match read(r) {
-        Ok(value) => Ok(Ok(value)),
-        Err(e) => {
-            *r = at;
-            skip(r).map(|()| Err(e))
+    fn slot<'de>(&self, key: &str, text: impl FnOnce() -> Cow<'de, str>) -> Slot<'de> {
+        match self.names.iter().position(|n| *n == key) {
+            Some(i) => Slot::Field(i),
+            None if self.keep => Slot::Other(text()),
+            None => Slot::Other(Cow::Borrowed("")),
         }
     }
 }
 
-/// A value of any kind, as serde_json holds one.
-pub fn any(r: &mut Reader<'_>) -> Result<Value, Unfit> {
-    match r.peek() {
-        Some(b'[') => list(r, any).map(Value::Array),
-        Some(b'{') => {
-            let mut out = Map::new();
-            object(r, |k, r| {
-                out.insert(k.into(), any(r)?);
-                Ok(())
-            })?;
-            Ok(Value::Object(out))
+/// Which field a key names, else the key.
+pub enum Slot<'de> {
+    Field(usize),
+    Other(Cow<'de, str>),
+}
+
+impl<'de> DeserializeSeed<'de> for Names {
+    type Value = Slot<'de>;
+
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<Slot<'de>, D::Error> {
+        d.deserialize_any(self)
+    }
+}
+
+impl<'de> Visitor<'de> for Names {
+    type Value = Slot<'de>;
+
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("a key")
+    }
+
+    fn visit_str<E: de::Error>(self, v: &str) -> Result<Slot<'de>, E> {
+        Ok(self.slot(v, || Cow::Owned(v.into())))
+    }
+
+    fn visit_borrowed_str<E: de::Error>(self, v: &'de str) -> Result<Slot<'de>, E> {
+        Ok(self.slot(v, || Cow::Borrowed(v)))
+    }
+
+    refuse!("a key"; unit none some bool i64 u64 f64 bytes seq map enum newtype);
+}
+
+/// A type that deserializes itself: a model or a union.
+pub struct Of<T>(PhantomData<fn() -> T>);
+
+impl<T> Clone for Of<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for Of<T> {}
+
+impl<'de, T: Deserialize<'de>> DeserializeSeed<'de> for Of<T> {
+    type Value = T;
+
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<T, D::Error> {
+        T::deserialize(d)
+    }
+}
+
+pub fn of<T>() -> Of<T> {
+    Of(PhantomData)
+}
+
+/// The value `S` reads, boxed.
+#[derive(Clone, Copy)]
+pub struct Boxed<S>(S);
+
+impl<'de, S: DeserializeSeed<'de>> DeserializeSeed<'de> for Boxed<S> {
+    type Value = Box<S::Value>;
+
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+        self.0.deserialize(d).map(Box::new)
+    }
+}
+
+pub fn boxed<S>(seed: S) -> Boxed<S> {
+    Boxed(seed)
+}
+
+/// Null, else the value `S` reads.
+#[derive(Clone, Copy)]
+pub struct Nullable<S>(S);
+
+impl<'de, S: DeserializeSeed<'de>> DeserializeSeed<'de> for Nullable<S> {
+    type Value = Option<S::Value>;
+
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+        d.deserialize_option(self)
+    }
+}
+
+impl<'de, S: DeserializeSeed<'de>> Visitor<'de> for Nullable<S> {
+    type Value = Option<S::Value>;
+
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("a value or null")
+    }
+
+    fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+        Ok(None)
+    }
+
+    fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+        Ok(None)
+    }
+
+    fn visit_some<D: Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+        self.0.deserialize(d).map(Some)
+    }
+}
+
+pub fn nullable<S>(seed: S) -> Nullable<S> {
+    Nullable(seed)
+}
+
+/// An array, each item read by `S`.
+#[derive(Clone, Copy)]
+pub struct List<S>(S);
+
+impl<'de, S: DeserializeSeed<'de> + Copy> Kinds<'de> for List<S> {
+    type Value = Vec<S::Value>;
+    const EXPECTED: &'static str = "an array";
+
+    fn binary<D: Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+        d.deserialize_seq(binary::Items(self.0))
+    }
+
+    fn seq<A: SeqAccess<'de>>(self, mut a: A) -> Result<Self::Value, A::Error> {
+        Parts::default().tail(&mut a, self.0)
+    }
+}
+
+pub fn list<S>(seed: S) -> Shape<List<S>> {
+    Shape(List(seed))
+}
+
+/// An object, each value read by `S`, under its key, as pairs in the order they arrived; a
+/// repeated key takes the later value. In binary, a list of key and value.
+#[derive(Clone, Copy)]
+pub struct Map<S>(S);
+
+impl<'de, S: DeserializeSeed<'de> + Copy> Kinds<'de> for Map<S> {
+    type Value = Vec<(String, S::Value)>;
+    const EXPECTED: &'static str = "an object";
+
+    fn binary<D: Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+        d.deserialize_seq(binary::Items(binary::Pair(self.0)))
+    }
+
+    fn map<A: MapAccess<'de>>(self, mut a: A) -> Result<Self::Value, A::Error> {
+        let mut out = Vec::new();
+        while let Some(key) = a.next_key_seed(Text)? {
+            Parts::other(&mut out, key.into_owned(), || a.next_value_seed(self.0))?;
         }
-        _ => r.token(),
+        Ok(out)
     }
 }
 
-/// A value that is null or what `item` reads: `None` for null.
-pub fn nullable<'a, T>(
-    r: &mut Reader<'a>,
-    item: impl FnOnce(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<Option<T>, Unfit> {
-    match r.peek() {
-        Some(b'n') => null(r).map(|()| None),
-        _ => item(r).map(Some),
-    }
-}
-
-/// The array here, read item by item.
-pub fn array<'r, 'a>(r: &'r mut Reader<'a>) -> Result<Parts<'r, 'a>, Unfit> {
-    Parts::open(r, b'[', "an array")
-}
-
-/// An array, each item read by `item`.
-pub fn list<'a, T>(
-    r: &mut Reader<'a>,
-    item: impl FnMut(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<Vec<T>, Unfit> {
-    tail(array(r)?, item)
-}
-
-/// The items of `a` not yet read, each read by `item`.
-pub fn tail<'a, T>(
-    mut a: Parts<'_, 'a>,
-    mut item: impl FnMut(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<Vec<T>, Unfit> {
-    let mut out = Vec::new();
-    while let Some(i) = a.next()? {
-        out.push(item(a.r).map_err(|e| e.index(i))?);
-    }
-    Ok(out)
-}
-
-/// The next item of `a`, a tuple's position, read by `item`: `None` where the array has ended.
-pub fn element<'a, T>(
-    a: &mut Parts<'_, 'a>,
-    item: impl FnOnce(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<Option<T>, Unfit> {
-    let Some(i) = a.next()? else {
-        return Ok(None);
-    };
-    item(a.r).map(Some).map_err(|e| e.index(i))
-}
-
-/// The end of `a`, an array of no items past those read.
-pub fn fixed(mut a: Parts<'_, '_>) -> Result<(), Unfit> {
-    match a.next()? {
-        Some(i) => Err(Unfit::kind("no more items than the tuple holds").index(i)),
-        None => Ok(()),
-    }
-}
-
-/// An object, each entry to `each`: its key, and the reader at its value, which `each` reads.
-pub fn object<'a>(
-    r: &mut Reader<'a>,
-    mut each: impl FnMut(&str, &mut Reader<'a>) -> Result<(), Unfit>,
-) -> Result<(), Unfit> {
-    let mut o = Parts::open(r, b'{', "an object")?;
-    while o.next()?.is_some() {
-        let key = o.key()?;
-        each(&key.0, o.r)?;
-    }
-    Ok(())
-}
-
-/// An object, each value read by `item`, under its key.
-pub fn map<'a, T>(
-    r: &mut Reader<'a>,
-    mut item: impl FnMut(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<BTreeMap<String, T>, Unfit> {
-    let mut out = BTreeMap::new();
-    object(r, |k, r| {
-        out.insert(k.into(), item(r).map_err(|e| e.field(k))?);
-        Ok(())
-    })?;
-    Ok(out)
-}
-
-/// A model field's value here, read by `item` into `slot`, its failure kept there: a later value
-/// under the same key replaces it. Fails where the text holds no value here.
-pub fn put<'a, T>(
-    slot: &mut Option<Result<T, Unfit>>,
-    r: &mut Reader<'a>,
-    item: impl FnOnce(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<(), Unfit> {
-    *slot = Some(settle(r, item)?);
-    Ok(())
-}
-
-/// A required field `name`, from its `slot`: absent where the object had no value for it.
-pub fn field<T>(slot: Option<Result<T, Unfit>>, name: &str) -> Result<T, Unfit> {
-    match slot {
-        Some(read) => read.map_err(|e| e.field(name)),
-        None => Err(Unfit::other(super::ABSENT).field(name)),
-    }
-}
-
-/// An optional field `name`, from its `slot`: `None` where absent.
-pub fn optional<T>(slot: Option<Result<T, Unfit>>, name: &str) -> Result<Option<T>, Unfit> {
-    slot.transpose().map_err(|e| e.field(name))
-}
-
-/// A model's entries under keys no field names, and the first of them that failed.
-pub struct Rest<T> {
-    entries: BTreeMap<String, T>,
-    unfit: Option<Unfit>,
-}
-
-impl<T> Default for Rest<T> {
-    fn default() -> Self {
-        Rest {
-            entries: BTreeMap::new(),
-            unfit: None,
-        }
-    }
-}
-
-impl<T> Rest<T> {
-    /// The entries, or the first failure among them.
-    pub fn done(self) -> Result<BTreeMap<String, T>, Unfit> {
-        match self.unfit {
-            Some(unfit) => Err(unfit),
-            None => Ok(self.entries),
-        }
-    }
-}
-
-/// The value here under `key`, which no field names, read by `item` into `rest`.
-pub fn rest<'a, T>(
-    rest: &mut Rest<T>,
-    key: &str,
-    r: &mut Reader<'a>,
-    item: impl FnOnce(&mut Reader<'a>) -> Result<T, Unfit>,
-) -> Result<(), Unfit> {
-    match settle(r, item)? {
-        Ok(value) => {
-            rest.entries.insert(key.into(), value);
-        }
-        Err(e) => {
-            rest.unfit.get_or_insert(e.field(key));
-        }
-    }
-    Ok(())
-}
-
-/// The value here under `key`, which no field of a closed model names: a failure kept in `rest`.
-pub fn unnamed(rest: &mut Rest<()>, key: &str, r: &mut Reader<'_>) -> Result<(), Unfit> {
-    rest.unfit
-        .get_or_insert_with(|| Unfit::other(super::UNNAMED).field(key));
-    skip(r)
+pub fn map<S>(seed: S) -> Shape<Map<S>> {
+    Shape(Map(seed))
 }

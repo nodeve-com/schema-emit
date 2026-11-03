@@ -13,15 +13,15 @@ impl StdForm<'_> {
     pub(super) fn union_name(&self, union: &Union) -> String {
         let declared = union.name.as_deref().map(camel);
         let models = self.schema.models.len();
-        if let Some(name) = declared.filter(|n| !(0..models).any(|i| (self.name)(i) == *n)) {
+        if let Some(name) = declared.filter(|n| !(0..models).any(|i| self.model_name(i) == *n)) {
             return name;
         }
         let names: Vec<String> = union
             .variants
             .iter()
             .map(|v| match v.base {
-                Base::Model(m) if !v.nullable => camel(&(self.name)(m)),
-                _ => camel(&self.ty(v, None)),
+                Base::Model(m) if !v.nullable => camel(&self.model_name(m)),
+                _ => camel(&plain(&self.ty(v, None))),
             })
             .collect();
         names.join("Or")
@@ -32,7 +32,7 @@ impl StdForm<'_> {
     pub(super) fn union_ty(&self, union: &Union, owner: Option<usize>) -> String {
         let name = self.union_name(union);
         match owner {
-            Some(o) if self.boxes(union, o) => format!("Box<{name}>"),
+            Some(o) if self.boxes(union, o) => format!("::std::boxed::Box<{name}>"),
             _ => name,
         }
     }
@@ -59,7 +59,7 @@ impl StdForm<'_> {
                 Base::Model(m) if !v.nullable => self.schema.models.get(m).map(|m| m.name.clone()),
                 _ => None,
             };
-            let mut id = camel(&name.unwrap_or_else(|| self.ty(v, None)));
+            let mut id = camel(&name.unwrap_or_else(|| plain(&self.ty(v, None))));
             while used.contains(&id) {
                 id.push('_');
             }
@@ -77,7 +77,7 @@ impl StdForm<'_> {
         }
         format!(
             "{} #[allow(dead_code)] pub enum {} {{ {out}}}\n",
-            self.derives(),
+            self.derives(false),
             self.union_name(union)
         )
     }
@@ -171,4 +171,16 @@ pub fn camel(name: &str) -> String {
         out.insert(0, 'V');
     }
     out
+}
+
+/// A Rust type's text without the paths that qualify the standard names, which a name reads as words.
+fn plain(ty: &str) -> String {
+    [
+        "::std::string::",
+        "::std::vec::",
+        "::std::boxed::",
+        "::core::option::",
+    ]
+    .iter()
+    .fold(ty.to_string(), |t, path| t.replace(path, ""))
 }

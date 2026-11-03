@@ -1,33 +1,63 @@
-//! Functions decoding JSON text into the std types. A model's is `decode_<name>`, which refuses
-//! text nested too deep and names the model at the root of a path that says where a value doesn't
-//! fit; each also has a `read_<name>` of the value at a reader's place, without that root, which
-//! the union and the model around it call. Each reader is an expression over
-//! `schema_emit_runtime::decode`'s, which read the text once, in order, and put each step on the
-//! path of a failure inside them. A union decodes in `decode/union.rs`.
+//! Decoding into the std types. Each model gets a serde `Deserialize` impl, written out here
+//! rather than derived, and `decode_<name>`, the entry over a deserializer of any format: it
+//! names the model at the root of a path that says where a value doesn't fit (`Model.field[2].key`).
+//! The impl visits the object's entries as the deserializer reads them and builds no
+//! `serde_json::Value`. A field's value is read through a seed (`decode/seeds.rs`); a union
+//! decodes in `decode/union.rs`.
 //!
-//! A model reads each entry of the object as it comes, into its field's slot, which keeps the
-//! value or its failure; a repeated key replaces it. Then the fields take their slots in schema
-//! order, so the first field that fails, or is required and absent, is the failure. A key no field
-//! names fails on a closed model, after the fields. An open model that holds no such keys skips
-//! them. Every other key goes to the field of keys no field names, each value read as that
-//! field's type. A field whose type holds its own model is boxed, as the struct has it.
+//! A model reads each entry into its field's slot; a repeated key replaces it. A required field
+//! that fails or is absent fails the model at once. An optional field that fails is absent and
+//! a skip (`Skips`), which `decode_<name>` returns beside the value. A key no field names fails a
+//! closed model, goes to the field of keys no field names if a check reads
+//! them, and is kept as text otherwise if the model is open. A model that is one value reads that value.
+//!
+//! In a format that isn't human-readable, the model's fields are read in order, as `binary.rs`
+//! writes the reading.
 
 use std::fmt::Write as _;
 
-use super::{idents, tuple_of, StdForm};
-use crate::ir::{Base, Int, Model, Ty};
+use super::{idents, StdForm};
+use crate::ir::Model;
 use crate::Error;
 
+mod binary;
+mod seeds;
 mod union;
 
-/// The runtime's decoders, as emitted code names them.
-fn d(name: &str) -> String {
+/// The runtime's decode part, as emitted code names it.
+pub(super) fn d(name: &str) -> String {
     format!("{}::decode::{name}", crate::emit::STD)
 }
 
+/// The code of a model's fields.
+#[derive(Default)]
+struct Fields {
+    /// Each field's slot.
+    slots: String,
+    /// The arm reading each field's entry.
+    arms: String,
+    /// The check that each required field is there.
+    requires: String,
+    /// The struct's initializer of each field.
+    init: String,
+}
+
+/// The code of a model's keys no field names.
+#[derive(Default)]
+struct Unnamed {
+    /// Where such keys are kept.
+    decl: String,
+    /// The struct's initializer of the field holding them.
+    init: String,
+    /// The arm reading such a key's value.
+    arm: String,
+    /// Whether the key's text is kept.
+    keep: bool,
+}
+
 impl StdForm<'_> {
-    /// Each union's and each model's decode functions.
-    pub(super) fn decoders(&self) -> Result<String, Error> {
+    /// Each union's and each model's decode code.
+    pub(super) fn decoders(&self) -> ::core::result::Result<String, Error> {
         let mut out = String::new();
         for (_, union) in self.distinct_unions() {
             out.push_str(&self.union_decoder(union)?);
@@ -40,190 +70,171 @@ impl StdForm<'_> {
         Ok(out)
     }
 
-    /// The name of model `i`'s decode function, without `read_` or `decode_`.
+    /// The name of model `i`'s decode function, without `decode_`: its name in snake case, with
+    /// `_` added while an earlier model's is the same.
     fn decoder_id(&self, i: usize) -> String {
-        idents::snake(&(self.name)(i))
-    }
-
-    /// Model `i`'s `read_` and `decode_` functions.
-    fn model_decoder(&self, i: usize, m: &Model) -> String {
-        let (name, id) = ((self.name)(i), self.decoder_id(i));
-        let unfit = d("Unfit");
-        let mut out = format!(
-            "#[allow(dead_code)] pub fn decode_{id}(v: &str) -> Result<{name}, {unfit}> {{ \
-             {}(v, {:?}, read_{id}) }}\n",
-            d("root"),
-            m.name
-        );
-        let (head, init, tail) = self.model_body(i, m);
-        let _ = writeln!(
-            out,
-            "#[allow(dead_code, unused_variables)] pub fn read_{id}(v: &mut {}<'_>) \
-             -> Result<{name}, {unfit}> {{ {head}let out = {name} {{ {init}}}; {tail}Ok(out) }}",
-            d("Reader")
-        );
-        out
-    }
-
-    /// What goes before a model's struct, its fields, and what goes after.
-    fn model_body(&self, i: usize, m: &Model) -> (String, String, String) {
-        let names = idents::of(m);
-        let others = |entries: String| match &m.others {
-            Some(_) => format!("{}: {entries}, ", names.others),
-            None => String::new(),
-        };
-        if m.is_value() {
-            let init = self.value_fields(i, m, &names.fields);
-            let empty = others("::std::collections::BTreeMap::new()".into());
-            return (String::new(), init + &empty, String::new());
-        }
-        let (mut head, mut arms, mut init) = (String::new(), String::new(), String::new());
-        for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
-            let read = self.dec(&f.ty, Some(i), 1);
-            let how = if f.required { "field" } else { "optional" };
-            let _ = write!(head, "let mut f{k} = None; ");
-            let _ = write!(
-                arms,
-                "{:?} => {}(&mut f{k}, x0, |x0| {read}), ",
-                f.name,
-                d("put")
-            );
-            let _ = write!(init, "{n}: {}(f{k}, {:?})?, ", d(how), f.name);
-        }
-        let (rest, other) = self.unnamed(m);
-        let _ = write!(
-            head,
-            "{rest}{}(v, |k, x0| match k {{ {arms}_ => {other} }})?; ",
-            d("object")
-        );
-        init.push_str(&others("o.done()?".into()));
-        let tail = match m.others.is_none() && !m.open {
-            true => "o.done()?; ".into(),
-            false => String::new(),
-        };
-        (head, init, tail)
-    }
-
-    /// What a model does with a key no field names: the `o` it keeps such keys in, where it
-    /// keeps them, and the arm reading the key's value.
-    fn unnamed(&self, m: &Model) -> (String, String) {
-        let rest = format!("let mut o = {}::default(); ", d("Rest"));
-        match &m.others {
-            Some(held) => {
-                let read = self.dec(held, None, 1);
-                let arm = format!("{}(&mut o, k, x0, |x0| {read})", d("rest"));
-                (rest, arm)
+        let mut used: Vec<String> = Vec::new();
+        for j in 0..=i {
+            let mut id = idents::snake(&self.model_name(j));
+            while used.contains(&id) {
+                id.push('_');
             }
-            None if m.open => (String::new(), format!("{}(x0)", d("skip"))),
-            None => (rest, format!("{}(&mut o, k, x0)", d("unnamed"))),
+            used.push(id);
         }
+        used.pop().unwrap_or_default()
     }
 
-    /// The fields of a model that is one value, each read from that value.
-    fn value_fields(&self, i: usize, m: &Model, names: &[String]) -> String {
+    /// The name of model `i`'s decode function, as the emitted code declares it: `decode_` and
+    /// its id. A model written elsewhere has its function there, not here.
+    pub fn decoder(&self, i: usize) -> String {
+        format!("decode_{}", self.decoder_id(i))
+    }
+
+    /// Model `i`'s `decode_` function and `Deserialize` impl.
+    fn model_decoder(&self, i: usize, m: &Model) -> String {
+        let (name, id) = (self.model_name(i), self.decoder_id(i));
+        let body = match m.is_value() {
+            true => self.value_body(i, m),
+            false => self.object_body(i, m),
+        };
+        let (de, deser) = (d("Deserialize"), d("Deserializer"));
+        format!(
+            "#[allow(dead_code)] pub fn decode_{id}<'de, __D: {deser}<'de>>(d: __D) \
+             -> ::core::result::Result<({name}, {}), {}> {{ {}(|| <{name} as {de}<'de>>::deserialize(d), {:?}) }}\n\
+             impl<'de> {de}<'de> for {name} {{ \
+             fn deserialize<__D: {deser}<'de>>(d: __D) -> ::core::result::Result<{name}, __D::Error> {{ {body} }} }}\n",
+            d("Skips"),
+            d("Unfit"),
+            d("root"),
+            m.name,
+        )
+    }
+
+    /// The body of the impl of a model that is one value, read from the value whole.
+    fn value_body(&self, i: usize, m: &Model) -> String {
+        let names = idents::of(m);
         let mut init = String::new();
-        for (f, n) in m.fields.iter().zip(names) {
-            let read = format!("{}?", self.dec(&f.ty, Some(i), 0));
+        for (f, n) in m.fields.iter().zip(&names.fields) {
+            let seed = self.seed(&f.ty, Some(i));
+            let read = format!("{}::deserialize({seed}, d)?", d("DeserializeSeed"));
             let read = if f.required {
                 read
             } else {
-                format!("Some({read})")
+                format!(
+                    "{}::deserialize({}({seed}), d)?",
+                    d("DeserializeSeed"),
+                    d("skip")
+                )
             };
             let _ = write!(init, "{n}: {read}, ");
         }
-        init
-    }
-
-    /// An expression of `Result<T, Unfit>`: the value at `depth` read as `ty`, a field of model
-    /// `owner` where it is one. `depth` numbers the names a closure binds.
-    pub(super) fn dec(&self, ty: &Ty, owner: Option<usize>, depth: usize) -> String {
-        if !ty.nullable {
-            return self.dec_base(ty, owner, depth);
+        if m.others.is_some() {
+            let _ = write!(init, "{}: ::std::vec::Vec::new(), ", names.others);
+        } else if m.open {
+            let _ = write!(init, "{}: ::std::string::String::new(), ", names.others);
         }
-        let x = format!("x{depth}");
-        let inner = self.dec_base(ty, owner, depth.saturating_add(1));
-        format!("{}({}, |{x}| {inner})", d("nullable"), bound(depth))
+        format!("Ok({} {{ {init}}})", self.model_name(i))
     }
 
-    /// [`StdForm::dec`] of a type that isn't nullable.
-    fn dec_base(&self, ty: &Ty, owner: Option<usize>, depth: usize) -> String {
-        let v = bound(depth);
-        let read = |name: &str| format!("{}({v})", d(name));
-        let boxed = |expr: String, boxes: bool| match boxes {
-            true => format!("{expr}.map(Box::new)"),
-            false => expr,
-        };
-        match &ty.base {
-            Base::Null => read("null"),
-            Base::Any => read("any"),
-            Base::Bool => read("boolean"),
-            Base::Int(Int::U64) => read("uint"),
-            Base::Int(_) => read("int"),
-            Base::Float(_) => read("float"),
-            Base::Text => read("text"),
-            Base::Timestamp => read("timestamp"),
-            Base::Duration => read("duration"),
-            Base::Bytes => read("bytes"),
-            Base::List(item) | Base::Map(item) => self.dec_items(ty, item, depth),
-            Base::Tuple { .. } => self.dec_tuple(ty, owner, depth),
-            Base::Union(u) => {
-                let call = format!("read_{}({v})", idents::snake(&self.union_name(u)));
-                boxed(call, owner.is_some_and(|o| self.boxes(u, o)))
-            }
-            Base::Model(m) => {
-                let module = (self.external)(*m).map(|p| p + "::").unwrap_or_default();
-                let call = format!("{module}read_{}({v})", self.decoder_id(*m));
-                boxed(call, owner.is_some_and(|o| self.holds(*m, o)))
-            }
-        }
-    }
-
-    /// A list or map of `item` read in a closure: each item or entry value read as `item`.
-    fn dec_items(&self, ty: &Ty, item: &Ty, depth: usize) -> String {
-        let how = if matches!(ty.base, Base::List(_)) {
-            "list"
-        } else {
-            "map"
-        };
-        let item = self.dec(item, None, depth.saturating_add(1));
-        format!("{}({}, |x{depth}| {item})", d(how), bound(depth))
-    }
-
-    /// A tuple read in a closure that may refuse: its items from the array at `depth`, a position
-    /// each, then the list of the items past them.
-    fn dec_tuple(&self, ty: &Ty, owner: Option<usize>, depth: usize) -> String {
-        let Base::Tuple { prefix, rest } = &ty.base else {
-            return String::new();
-        };
-        let (v, x, next) = (bound(depth), format!("x{depth}"), depth.saturating_add(1));
-        let a = format!("a{depth}");
-        let mut parts = Vec::new();
-        for p in prefix {
-            let read = self.dec(p, owner, next);
-            parts.push(format!("{}(&mut {a}, |{x}| {read})?", d("element")));
-        }
-        let fixed = match rest {
-            Some(item) => {
-                let read = self.dec(item, None, next);
-                parts.push(format!("{}({a}, |{x}| {read})?", d("tail")));
-                String::new()
-            }
-            None => format!("{}({a})?; ", d("fixed")),
-        };
+    /// The body of the impl of a model of an object: a visitor reading its entries.
+    fn object_body(&self, i: usize, m: &Model) -> String {
+        let name = self.model_name(i);
+        let (f, u) = (self.fields_code(i, m), self.unnamed(m));
+        let keys: Vec<String> = m.fields.iter().map(|f| format!("{:?}", f.name)).collect();
+        let (parts, slot, ignored) = (d("Parts"), d("Slot"), d("IgnoredAny"));
+        let read = format!(
+            "{}{}\
+             while let Some(k) = m.next_key_seed({}::new(&[{}], {}))? {{ match k {{ {}\
+             {slot}::Field(_) => {{ m.next_value::<{ignored}>()?; }} {} }} }} \
+             {}{parts}::finish((|| Some({name} {{ {}{}}}))())",
+            f.slots,
+            u.decl,
+            d("Names"),
+            keys.join(", "),
+            u.keep,
+            f.arms,
+            u.arm,
+            f.requires,
+            f.init,
+            u.init,
+        );
         format!(
-            "(|| -> Result<_, {}> {{ let mut {a} = {}({v})?; let t = {}; {fixed}Ok(t) }})()",
-            d("Unfit"),
-            d("array"),
-            tuple_of(&parts)
+            "#[derive(Clone, Copy)] struct __V; impl<'de> {}<'de> for __V {{ type Value = {name}; \
+             const EXPECTED: &'static str = \"an object\"; \
+             {} \
+             #[allow(unused_mut, unused_variables)] \
+             fn map<__A: {}<'de>>(self, mut m: __A) -> ::core::result::Result<{name}, __A::Error> {{ {read} }} }} \
+             {}::deserialize({}(__V), d)",
+            d("Kinds"),
+            self.model_positions(i, m),
+            d("MapAccess"),
+            d("DeserializeSeed"),
+            d("Shape"),
         )
     }
-}
 
-/// The name the value at `depth` is bound to: the function's own at the root, else the closure
-/// above it binds it.
-fn bound(depth: usize) -> String {
-    match depth.checked_sub(1) {
-        Some(above) => format!("x{above}"),
-        None => "v".into(),
+    /// Model `i`'s field code.
+    fn fields_code(&self, i: usize, m: &Model) -> Fields {
+        let names = idents::of(m);
+        let (slot, parts) = (d("Slot"), d("Parts"));
+        let mut out = Fields::default();
+        for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
+            let seed = self.seed(&f.ty, Some(i));
+            let _ = write!(out.slots, "let mut f{k} = None; ");
+            let step = format!(".{}", f.name);
+            let arm = match f.required {
+                true => {
+                    format!("{parts}::field(&mut f{k}, {step:?}, || m.next_value_seed({seed}))?")
+                }
+                false => format!(
+                    "{parts}::optional(&mut f{k}, {step:?}, || m.next_value_seed({}({seed})))?",
+                    d("skip")
+                ),
+            };
+            let _ = write!(out.arms, "{slot}::Field({k}) => {arm}, ");
+            if f.required {
+                let _ = write!(
+                    out.requires,
+                    "{parts}::require::<_, __A::Error>(&f{k}, {step:?})?; "
+                );
+                let _ = write!(out.init, "{n}: f{k}?, ");
+            } else {
+                let _ = write!(out.init, "{n}: f{k}, ");
+            }
+        }
+        out
+    }
+
+    /// What model `m` does with a key no field names.
+    fn unnamed(&self, m: &Model) -> Unnamed {
+        let slot = d("Slot");
+        match &m.others {
+            Some(held) => {
+                let read = format!("|| m.next_value_seed({})", self.seed(held, None));
+                Unnamed {
+                    decl: "let mut o = ::std::vec::Vec::new(); ".into(),
+                    init: format!("{}: o, ", idents::of(m).others),
+                    arm: format!(
+                        "{slot}::Other(k) => {}::other(&mut o, k, {read})?, ",
+                        d("Parts")
+                    ),
+                    keep: true,
+                }
+            }
+            None if m.open => Unnamed {
+                decl: format!("let mut o = {}::default(); ", d("Unread")),
+                init: format!("{}: o.text(), ", idents::of(m).others),
+                arm: format!("{slot}::Other(k) => o.push(&k, &mut m)?, "),
+                keep: true,
+            },
+            None => Unnamed {
+                arm: format!(
+                    "{slot}::Other(k) => return ::core::result::Result::Err({}::unnamed(&k)), ",
+                    d("Parts")
+                ),
+                keep: true,
+                ..Unnamed::default()
+            },
+        }
     }
 }

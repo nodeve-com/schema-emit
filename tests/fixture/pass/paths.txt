@@ -1,4 +1,3 @@
-a reading/a list item past its width, and every failure reported
 a reading/a nested field out of range
 a reading/all in range
 a reading/an optional field absent is silence

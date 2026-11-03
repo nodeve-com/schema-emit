@@ -6,7 +6,6 @@ allOf meets an integer and a number of one field: a whole number/whole
 allOf merges fields by name, and a field's checks from each subschema apply/in every range
 allOf merges fields by name, and a field's checks from each subschema apply/past the first subschema's bound
 allOf narrows an integer to the narrower width its subschema states/in int8
-allOf narrows an integer to the narrower width its subschema states/past int8
 allOf of false makes a field's every value invalid/any value
 allOf of subschemas that only list choices takes their kind/in both
 allOf of subschemas that only list choices takes their kind/in one

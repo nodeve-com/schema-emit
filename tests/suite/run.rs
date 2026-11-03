@@ -40,59 +40,18 @@ pub fn module(n: usize, case: &Case) -> Result<String, Error> {
     let std = StdForm::new(&case.schema, &name);
     let check = Emitter::new(&case.schema, &std).check(case.model, "check")?;
     Ok(format!(
-        "mod c{n} {{ #![allow(unused_imports, clippy::all)] use ::schema_emit_runtime as s;\n{}{check}\
+        "mod c{n} {{ #![allow(unused_imports, clippy::all)] use ::schema_emit_runtime as __s;\n{}{check}\
          pub fn run() -> super::Outcome {{ \
-         match decode_m{}({:?}) {{ Ok(v) => {{ let mut f = s::Failures::<16>::default(); \
+         match __s::decode::json({:?}, |d| decode_m{}(d)) {{ Ok((_, s)) if !s.kept.is_empty() => super::refused(&s.kept[0]), Ok((v, _)) => {{ let mut f = __s::Failures::<16>::default(); \
          check(&v, &mut f); super::outcome(&f) }} Err(e) => super::refused(&e) }} }} }}\n",
         std.items()?,
-        case.model,
-        case.json
+        case.json,
+        case.model
     ))
 }
 
 /// Builds and runs `modules`, each `(n, source)`, returning each one's outcome by `n`.
 pub fn run(modules: &[(usize, String)]) -> BTreeMap<usize, Outcome> {
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("schema-emit-suite");
-    std::fs::create_dir_all(dir.join("src")).unwrap();
-    write_project(&dir, modules);
-    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
-    let built = Command::new(&cargo)
-        .args(["build", "--quiet", "--offline", "--manifest-path"])
-        .arg(dir.join("Cargo.toml"))
-        .env("CARGO_TARGET_DIR", dir.join("target"))
-        .output()
-        .unwrap();
-    assert!(
-        built.status.success(),
-        "the emitted checks don't build:\n{}",
-        String::from_utf8_lossy(&built.stderr)
-    );
-    let out = Command::new(dir.join("target/debug/schema-emit-suite"))
-        .output()
-        .unwrap();
-    assert!(out.status.success(), "the emitted checks failed to run");
-    String::from_utf8(out.stdout)
-        .unwrap()
-        .lines()
-        .map(outcome_of)
-        .collect()
-}
-
-/// Writes the program's manifest and source under `dir`.
-fn write_project(dir: &Path, modules: &[(usize, String)]) {
-    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("schema-emit-runtime");
-    std::fs::write(
-        dir.join("Cargo.toml"),
-        format!(
-            "[package]\nname = \"schema-emit-suite\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\
-             [dependencies]\nschema-emit-runtime = {{ path = {:?}, features = [\"decode\"] }}\n\
-             serde_json = {{ version = \"1\", features = [\"float_roundtrip\"] }}\n\
-             chrono = {{ version = \"0.4\", default-features = false }}\n[workspace]\n\
-             [profile.dev]\ndebug = false\n",
-            runtime.display().to_string()
-        ),
-    )
-    .unwrap();
     let mut main = String::from(MAIN);
     for (_, m) in modules {
         main.push_str(m);
@@ -102,6 +61,57 @@ fn write_project(dir: &Path, modules: &[(usize, String)]) {
         let _ = writeln!(main, "print({n}, c{n}::run());");
     }
     main.push_str("}\n");
+    execute("schema-emit-suite", &main)
+        .lines()
+        .map(outcome_of)
+        .collect()
+}
+
+/// Builds the program `main` in a project named `name`, against schema-emit-runtime and the
+/// crates emitted code names, runs it, and gives what it printed.
+pub fn execute(name: &str, main: &str) -> String {
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
+    std::fs::create_dir_all(dir.join("src")).unwrap();
+    write_project(&dir, name, main);
+    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+    let built = Command::new(&cargo)
+        .args(["build", "--quiet", "--offline", "--manifest-path"])
+        .arg(dir.join("Cargo.toml"))
+        .env("CARGO_TARGET_DIR", dir.join("target"))
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "the emitted code doesn't build:\n{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let out = Command::new(dir.join("target/debug").join(name))
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "the emitted code failed to run:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8(out.stdout).unwrap()
+}
+
+/// Writes the program's manifest and source under `dir`.
+fn write_project(dir: &Path, name: &str, main: &str) {
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("schema-emit-runtime");
+    std::fs::write(
+        dir.join("Cargo.toml"),
+        format!(
+            "[package]\nname = \"{name}\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\
+             [dependencies]\nschema-emit-runtime = {{ path = {:?}, features = [\"decode\"] }}\n\
+             serde_json = {{ version = \"1\", features = [\"float_roundtrip\"] }}\n\
+             postcard = {{ version = \"1\", default-features = false, features = [\"alloc\"] }}\n\
+             chrono = {{ version = \"0.4\", default-features = false }}\n[workspace]\n\
+             [profile.dev]\ndebug = false\n",
+            runtime.display().to_string()
+        ),
+    )
+    .unwrap();
     std::fs::write(dir.join("src/main.rs"), main).unwrap();
 }
 

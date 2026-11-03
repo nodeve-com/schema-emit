@@ -1,6 +1,6 @@
 [package]
 name = "schema-emit"
-description = "JSON Schema to Rust: types, decoders of JSON text, and checks over typed values, linking schema-emit-runtime."
+description = "JSON Schema to Rust: types with serde decode and encode, and checks over typed values, linking schema-emit-runtime."
 version = "0.6.2"
 edition = "2021"
 license = "MPL-2.0"
@@ -33,6 +33,8 @@ iri-string = { version = "0.7", default-features = false, features = ["alloc"], 
 percent-encoding = { version = "2", optional = true }
 
 [dev-dependencies]
+# A binary format, to test that the emitted impls read and write it.
+postcard = { version = "1", default-features = false, features = ["alloc"] }
 serde_json = { version = "1", features = ["preserve_order", "raw_value"] }
 # The suite reads why a decode fails.
 schema-emit-runtime = { path = "schema-emit-runtime", version = "0.6.2", features = ["decode"] }
