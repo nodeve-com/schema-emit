@@ -99,7 +99,7 @@ dependencies = [
 [[package]]
 name = "pattern-emit"
 version = "0.6.2"
-source = "git+https://github.com/nodeve-com/pattern-emit?rev=787bf8ce5c92ebc0b84ae91f028f1861d8744252#787bf8ce5c92ebc0b84ae91f028f1861d8744252"
+source = "git+https://github.com/nodeve-com/pattern-emit?rev=1acab6a86e146143e8ab2ba5bde2dada963df88c#1acab6a86e146143e8ab2ba5bde2dada963df88c"
 dependencies = [
  "regex-automata",
  "regex-syntax",

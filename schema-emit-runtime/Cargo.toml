@@ -22,7 +22,7 @@ decode = ["dep:serde_json", "dep:chrono", "dep:humantime", "dep:base64"]
 
 [dependencies]
 # Search only: a pattern check walks a table that schema-emit built.
-pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "787bf8ce5c92ebc0b84ae91f028f1861d8744252", version = "0.6.2" }
+pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "1acab6a86e146143e8ab2ba5bde2dada963df88c", version = "0.6.2" }
 serde_json = { version = "1", features = ["preserve_order", "raw_value"], optional = true }
 # The reader of `human-duration` text: an optional sign, then humantime's text.
 humantime = { version = "2", optional = true }
