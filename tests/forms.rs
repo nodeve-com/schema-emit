@@ -150,7 +150,7 @@ fn an_open_model_skips_the_keys_no_field_names() {
         for (key, value) in extra {
             schema[*key] = value.clone();
         }
-        rooted(&schema).contains("decode::closed")
+        rooted(&schema).contains("decode::unnamed")
     };
     assert!(!closes(&[]));
     assert!(closes(&[("additionalProperties", json!(false))]));

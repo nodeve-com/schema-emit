@@ -1,14 +1,16 @@
 //! Functions decoding JSON text into the std types. A model's is `decode_<name>`, which refuses
 //! text nested too deep and names the model at the root of a path that says where a value doesn't
-//! fit; each also has a `read_<name>` of one value's text without that root, which the union and
-//! the model around it call. Each reader is an expression over `schema_emit_runtime::decode`'s,
-//! which put each step on the path of a failure inside them. A union decodes in `decode/union.rs`.
+//! fit; each also has a `read_<name>` of the value at a reader's place, without that root, which
+//! the union and the model around it call. Each reader is an expression over
+//! `schema_emit_runtime::decode`'s, which read the text once, in order, and put each step on the
+//! path of a failure inside them. A union decodes in `decode/union.rs`.
 //!
-//! A model takes its fields' text from the object first, then reads each in turn. A required field
-//! absent, and a key no field names on a closed model, are refused. An open model that holds no
-//! such keys skips them unread. Every other key goes to the field of keys no field names, each
-//! value read as that field's type. A field whose type holds its own model is boxed, as the struct
-//! has it.
+//! A model reads each entry of the object as it comes, into its field's slot, which keeps the
+//! value or its failure; a repeated key replaces it. Then the fields take their slots in schema
+//! order, so the first field that fails, or is required and absent, is the failure. A key no field
+//! names fails on a closed model, after the fields. An open model that holds no such keys skips
+//! them. Every other key goes to the field of keys no field names, each value read as that
+//! field's type. A field whose type holds its own model is boxed, as the struct has it.
 
 use std::fmt::Write as _;
 
@@ -56,8 +58,9 @@ impl StdForm<'_> {
         let (head, init, tail) = self.model_body(i, m);
         let _ = writeln!(
             out,
-            "#[allow(dead_code, unused_variables)] pub fn read_{id}(v: &str) \
-             -> Result<{name}, {unfit}> {{ {head}let out = {name} {{ {init}}}; {tail}Ok(out) }}"
+            "#[allow(dead_code, unused_variables)] pub fn read_{id}(v: &mut {}<'_>) \
+             -> Result<{name}, {unfit}> {{ {head}let out = {name} {{ {init}}}; {tail}Ok(out) }}",
+            d("Reader")
         );
         out
     }
@@ -74,26 +77,46 @@ impl StdForm<'_> {
             let empty = others("::std::collections::BTreeMap::new()".into());
             return (String::new(), init + &empty, String::new());
         }
-        let keys: Vec<String> = m.fields.iter().map(|f| format!("{:?}", f.name)).collect();
-        let keys = format!("&[{}]", keys.join(", "));
-        let (mut init, mut slots) = (String::new(), Vec::new());
+        let (mut head, mut arms, mut init) = (String::new(), String::new(), String::new());
         for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
             let read = self.dec(&f.ty, Some(i), 1);
             let how = if f.required { "field" } else { "optional" };
-            let _ = write!(init, "{n}: {}(f{k}, {:?}, |x0| {read})?, ", d(how), f.name);
-            slots.push(format!("f{k}"));
+            let _ = write!(head, "let mut f{k} = None; ");
+            let _ = write!(
+                arms,
+                "{:?} => {}(&mut f{k}, x0, |x0| {read}), ",
+                f.name,
+                d("put")
+            );
+            let _ = write!(init, "{n}: {}(f{k}, {:?})?, ", d(how), f.name);
         }
-        let rest = m.others.as_ref().map(|held| {
-            let read = self.dec(held, None, 1);
-            format!("{}(v, {keys}, |x0| {read})?", d("rest"))
-        });
-        let tail = match rest {
-            None if !m.open => format!("{}(v, {keys})?; ", d("closed")),
-            _ => String::new(),
+        let (rest, other) = self.unnamed(m);
+        let _ = write!(
+            head,
+            "{rest}{}(v, |k, x0| match k {{ {arms}_ => {other} }})?; ",
+            d("object")
+        );
+        init.push_str(&others("o.done()?".into()));
+        let tail = match m.others.is_none() && !m.open {
+            true => "o.done()?; ".into(),
+            false => String::new(),
         };
-        init.push_str(&others(rest.unwrap_or_default()));
-        let head = format!("let [{}] = {}(v, {keys})?; ", slots.join(", "), d("object"));
         (head, init, tail)
+    }
+
+    /// What a model does with a key no field names: the `o` it keeps such keys in, where it
+    /// keeps them, and the arm reading the key's value.
+    fn unnamed(&self, m: &Model) -> (String, String) {
+        let rest = format!("let mut o = {}::default(); ", d("Rest"));
+        match &m.others {
+            Some(held) => {
+                let read = self.dec(held, None, 1);
+                let arm = format!("{}(&mut o, k, x0, |x0| {read})", d("rest"));
+                (rest, arm)
+            }
+            None if m.open => (String::new(), format!("{}(x0)", d("skip"))),
+            None => (rest, format!("{}(&mut o, k, x0)", d("unnamed"))),
+        }
     }
 
     /// The fields of a model that is one value, each read from that value.
@@ -173,29 +196,24 @@ impl StdForm<'_> {
             return String::new();
         };
         let (v, x, next) = (bound(depth), format!("x{depth}"), depth.saturating_add(1));
-        let (mut parts, mut slots) = (Vec::new(), Vec::new());
-        for (i, p) in prefix.iter().enumerate() {
+        let a = format!("a{depth}");
+        let mut parts = Vec::new();
+        for p in prefix {
             let read = self.dec(p, owner, next);
-            parts.push(format!(
-                "{}(p{depth}_{i}, {i}, |{x}| {read})?",
-                d("element")
-            ));
-            slots.push(format!("p{depth}_{i}"));
+            parts.push(format!("{}(&mut {a}, |{x}| {read})?", d("element")));
         }
-        let n = prefix.len();
         let fixed = match rest {
             Some(item) => {
                 let read = self.dec(item, None, next);
-                parts.push(format!("{}({v}, {n}, |{x}| {read})?", d("tail")));
+                parts.push(format!("{}({a}, |{x}| {read})?", d("tail")));
                 String::new()
             }
-            None => format!("{}({v}, {n})?; ", d("fixed")),
+            None => format!("{}({a})?; ", d("fixed")),
         };
         format!(
-            "(|| -> Result<_, {}> {{ let [{}] = {}::<{n}>({v})?; {fixed}Ok({}) }})()",
+            "(|| -> Result<_, {}> {{ let mut {a} = {}({v})?; let t = {}; {fixed}Ok(t) }})()",
             d("Unfit"),
-            slots.join(", "),
-            d("tuple"),
+            d("array"),
             tuple_of(&parts)
         )
     }

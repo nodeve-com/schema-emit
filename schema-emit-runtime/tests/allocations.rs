@@ -59,23 +59,32 @@ enum Cell2 {
     Text(String),
 }
 
-fn read_cell(v: &str) -> Result<Cell2, Unfit> {
-    let int = d::int(v).map(Cell2::Int);
+fn read_cell(v: &mut d::Reader<'_>) -> Result<Cell2, Unfit> {
+    let raw = d::raw(v)?;
+    let int = d::int(&mut raw.clone()).map(Cell2::Int);
     int.or_else(|e| {
-        d::text(v)
+        d::text(&mut raw.clone())
             .map(Cell2::Text)
             .map_err(|f| Unfit::either(Some(e), f))
     })
 }
 
-fn read_row(v: &str) -> Result<Row, Unfit> {
-    let [id, name, tags, note, cell] = d::object(v, &["id", "name", "tags", "note", "cell"])?;
+fn read_row(v: &mut d::Reader<'_>) -> Result<Row, Unfit> {
+    let (mut id, mut name, mut tags, mut note, mut cell) = (None, None, None, None, None);
+    d::object(v, |k, x| match k {
+        "id" => d::put(&mut id, x, d::int),
+        "name" => d::put(&mut name, x, d::text),
+        "tags" => d::put(&mut tags, x, |x| d::list(x, d::text)),
+        "note" => d::put(&mut note, x, d::text),
+        "cell" => d::put(&mut cell, x, read_cell),
+        _ => d::skip(x),
+    })?;
     Ok(Row {
-        id: d::field(id, "id", d::int)?,
-        name: d::field(name, "name", d::text)?,
-        tags: d::field(tags, "tags", |x| d::list(x, d::text))?,
-        note: d::optional(note, "note", d::text)?,
-        cell: d::field(cell, "cell", read_cell)?,
+        id: d::field(id, "id")?,
+        name: d::field(name, "name")?,
+        tags: d::field(tags, "tags")?,
+        note: d::optional(note, "note")?,
+        cell: d::field(cell, "cell")?,
     })
 }
 
@@ -90,12 +99,11 @@ const ROWS: &str = r#"[
 const OWNED: usize = 3 + 2 + 3 + 1 + 1 + 1;
 
 #[test]
-fn a_decode_allocates_about_what_it_returns() {
+fn a_decode_allocates_only_what_it_returns() {
     let (rows, n) = calls(|| d::root(ROWS, "Rows", |v| d::list(v, read_row)));
     let rows = rows.unwrap();
     assert_eq!(rows.len(), 3);
     assert_eq!(rows[0].cell, Cell2::Int(1));
     assert_eq!(rows[1].cell, Cell2::Text("x".into()));
-    // Beside what it returns: a list's growth, and the reader's stack of brackets it skips.
-    assert!(n <= OWNED + 4, "{n} allocation calls");
+    assert!(n <= OWNED, "{n} allocation calls");
 }

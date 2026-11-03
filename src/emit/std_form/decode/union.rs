@@ -1,7 +1,7 @@
-//! A union decodes branch by branch, in order, each from the same text: the first that decodes and
-//! whose check passes is the value. Where none passes its check, the first that decodes is, so its
-//! check reports why. Where none decodes, the failure is the branch's the value fit furthest
-//! (`Unfit::either`). The check is the union's own, over its enum (`Emitter::check_union`), so a
+//! A union reads past its value once, then decodes it branch by branch, in order, each from the
+//! value's text: the first that decodes and whose check passes is the value. Where none passes
+//! its check, the first that decodes is, so its check reports why. Where none decodes, the failure
+//! is the branch's the value fit furthest (`Unfit::either`). The check is the union's own, over its enum (`Emitter::check_union`), so a
 //! branch of any type has one.
 
 use super::d;
@@ -23,7 +23,7 @@ impl StdForm<'_> {
             let read = self.dec(variant, None, 0);
             let held = self.variant_of(union, i, "x");
             arms.push_str(&format!(
-                "match {read} {{ Ok(x) => {{ let c = {held}; \
+                "match {{ let v = &mut raw.clone(); {read} }} {{ Ok(x) => {{ let c = {held}; \
                  let mut h = {STD}::Holds::default(); {ok}(&c, &mut h); \
                  if h.held() {{ return Ok(c); }} if first.is_none() {{ first = Some(c); }} }} \
                  Err(e) => {{ why = Some({}(why.take(), e)); }} }}\n",
@@ -31,11 +31,13 @@ impl StdForm<'_> {
             ));
         }
         out.push_str(&format!(
-            "#[allow(dead_code, unused_variables)] fn read_{id}(v: &str) \
-             -> Result<{name}, {unfit}> {{ \
+            "#[allow(dead_code, unused_variables)] fn read_{id}(v: &mut {}<'_>) \
+             -> Result<{name}, {unfit}> {{ let raw = {}(v)?; \
              let mut first: Option<{name}> = None; let mut why: Option<{unfit}> = None;\n{arms}\
              match first {{ Some(c) => Ok(c), \
-             None => Err(why.unwrap_or_else(|| {unfit}::kind(\"one of the union's branches\"))) }} }}\n"
+             None => Err(why.unwrap_or_else(|| {unfit}::kind(\"one of the union's branches\"))) }} }}\n",
+            d("Reader"),
+            d("raw")
         ));
         Ok(out)
     }

@@ -1,7 +1,7 @@
-//! What the decode functions that schema-emit writes link (feature `decode`): readers of one JSON
-//! value's text as a std value of one kind, and [`Unfit`], which says where a value fails to
-//! decode and why. The structured readers (list, map, tuple, model fields) are in `shapes`; each
-//! adds its step to the path of a failure inside it. `walk` reads the text.
+//! What the decode functions that schema-emit writes link (feature `decode`): readers of the JSON
+//! value at a [`Reader`]'s place as a std value of one kind, and [`Unfit`], which says where a
+//! value fails to decode and why. The structured readers (list, map, tuple, model fields) are in
+//! `shapes`; each adds its step to the path of a failure inside it. `walk` reads the text.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -10,13 +10,13 @@ use std::vec::Vec;
 
 use base64::Engine as _;
 use chrono::{DateTime, TimeDelta, Timelike, Utc};
-use serde_json::{Number, Value};
+use serde_json::Number;
 
 mod shapes;
 mod walk;
 
 pub use shapes::*;
-use walk::{first, parse, string};
+pub use walk::{Parts, Reader};
 
 /// Why a value has no std form.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,55 +119,58 @@ impl fmt::Display for Unfit {
 
 impl std::error::Error for Unfit {}
 
-pub fn null(v: &str) -> Result<(), Unfit> {
-    match first(v) {
-        Some(b'n') => parse(v),
+pub fn null(r: &mut Reader<'_>) -> Result<(), Unfit> {
+    match r.peek() {
+        Some(b'n') => r.token(),
         _ => Err(Unfit::kind("null")),
     }
 }
 
-pub fn boolean(v: &str) -> Result<bool, Unfit> {
-    match first(v) {
-        Some(b't' | b'f') => parse(v),
+pub fn boolean(r: &mut Reader<'_>) -> Result<bool, Unfit> {
+    match r.peek() {
+        Some(b't' | b'f') => r.token(),
         _ => Err(Unfit::kind("a boolean")),
     }
 }
 
-pub fn text(v: &str) -> Result<String, Unfit> {
-    string(v, "text").map(Cow::into_owned)
+pub fn text(r: &mut Reader<'_>) -> Result<String, Unfit> {
+    string(r, "text").map(Cow::into_owned)
 }
 
-/// A value of any kind, as serde_json holds one.
-pub fn any(v: &str) -> Result<Value, Unfit> {
-    parse(v)
-}
-
-/// A JSON number, or `expected` where `v` holds another kind.
-fn number(v: &str, expected: &'static str) -> Result<Number, Unfit> {
-    match first(v) {
-        Some(b'-' | b'0'..=b'9') => parse(v),
+/// The text of a JSON string, borrowed where it has no escapes.
+fn string<'a>(r: &mut Reader<'a>, expected: &'static str) -> Result<Cow<'a, str>, Unfit> {
+    match r.peek() {
+        Some(b'"') => r.token::<walk::Str>().map(|s| s.0),
         _ => Err(Unfit::kind(expected)),
     }
 }
 
-pub fn float(v: &str) -> Result<f64, Unfit> {
-    let n = number(v, "a number")?;
+/// A JSON number, or `expected` where another kind is here.
+fn number(r: &mut Reader<'_>, expected: &'static str) -> Result<Number, Unfit> {
+    match r.peek() {
+        Some(b'-' | b'0'..=b'9') => r.token(),
+        _ => Err(Unfit::kind(expected)),
+    }
+}
+
+pub fn float(r: &mut Reader<'_>) -> Result<f64, Unfit> {
+    let n = number(r, "a number")?;
     n.as_f64().ok_or(Unfit::other("a number no f64 holds"))
 }
 
-pub fn int(v: &str) -> Result<i64, Unfit> {
-    let whole = whole(v)?;
+pub fn int(r: &mut Reader<'_>) -> Result<i64, Unfit> {
+    let whole = whole(r)?;
     i64::try_from(whole).map_err(|_| Unfit::other("an integer past 64 bits"))
 }
 
-pub fn uint(v: &str) -> Result<u64, Unfit> {
-    let whole = whole(v)?;
+pub fn uint(r: &mut Reader<'_>) -> Result<u64, Unfit> {
+    let whole = whole(r)?;
     u64::try_from(whole).map_err(|_| Unfit::other("an integer past 64 bits"))
 }
 
 /// A whole number, which may be written as a float, such as `1.0`.
-fn whole(v: &str) -> Result<i128, Unfit> {
-    let n = number(v, "an integer")?;
+fn whole(r: &mut Reader<'_>) -> Result<i128, Unfit> {
+    let n = number(r, "an integer")?;
     if let Some(i) = n.as_i64() {
         return Ok(i128::from(i));
     }
@@ -184,8 +187,8 @@ fn whole(v: &str) -> Result<i128, Unfit> {
 
 /// RFC 3339 `date-time`, at UTC. A leap second reads as the next second, and a `:60` outside
 /// 23:59 UTC fails.
-pub fn timestamp(v: &str) -> Result<DateTime<Utc>, Unfit> {
-    let text = string(v, "an RFC 3339 timestamp")?;
+pub fn timestamp(r: &mut Reader<'_>) -> Result<DateTime<Utc>, Unfit> {
+    let text = string(r, "an RFC 3339 timestamp")?;
     let at = DateTime::parse_from_rfc3339(&text)
         .map_err(|_| Unfit::kind("an RFC 3339 timestamp"))?
         .with_timezone(&Utc);
@@ -201,8 +204,8 @@ pub fn timestamp(v: &str) -> Result<DateTime<Utc>, Unfit> {
 /// A duration, `format: human-duration`: an optional sign, then `humantime`'s text (`1.5s`,
 /// `90m`).
 #[allow(clippy::disallowed_methods)]
-pub fn duration(v: &str) -> Result<TimeDelta, Unfit> {
-    let text = string(v, "a duration")?;
+pub fn duration(r: &mut Reader<'_>) -> Result<TimeDelta, Unfit> {
+    let text = string(r, "a duration")?;
     let (negative, unsigned) = match text.as_bytes().first() {
         Some(b'-') => (true, text.get(1..).unwrap_or_default()),
         Some(b'+') => (false, text.get(1..).unwrap_or_default()),
@@ -221,9 +224,9 @@ pub fn duration(v: &str) -> Result<TimeDelta, Unfit> {
 const PAST_RANGE: &str = "an instant or span past the range";
 
 /// Padded base64 of the standard alphabet.
-pub fn bytes(v: &str) -> Result<Vec<u8>, Unfit> {
+pub fn bytes(r: &mut Reader<'_>) -> Result<Vec<u8>, Unfit> {
     base64::engine::general_purpose::STANDARD
-        .decode(&*string(v, "padded base64")?)
+        .decode(&*string(r, "padded base64")?)
         .map_err(|_| Unfit::kind("padded base64"))
 }
 
