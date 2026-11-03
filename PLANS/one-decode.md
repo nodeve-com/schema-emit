@@ -32,7 +32,26 @@
 
 ## Measure
 
-- Allocation calls and callgrind instructions for `answer_rows`. The plan lands only if decode does no worse than today's reader. Today, at schema-emit 80aa62e:
+The plan lands only if decode does no worse than today's reader, in both measures below.
+
+### schema-emit's own
+
+Built first, at today's reader, so its figures are the baseline.
+
+- `tests/cost.rs`, beside `suite.rs`: lowers each fixture, emits its std form and `decode_<name>`, and builds one program that counts allocations around each decode, as cel-emit's `references/count.rs` does.
+- Fixtures in `tests/fixture/cost/`, a schema and an instance per kind the plan touches: number widths (128-bit included), nested models, arrays of models, optional, nullable, and optional nullable fields, a union, a timestamp, open models with unknown keys read and skipped, escaped strings, a bad optional value skipped, and nesting near the depth limit.
+- The table shows each case beside two references built from the same text:
+  - `serde_json::from_str::<Value>`.
+  - Derive: the same emitted types with `#[derive(serde::Deserialize)]`, in a second module. No hand-written Rust per fixture.
+- The std form gains an option: its types without the decode, with extra derives an embedder names (`Serialize`, say).
+- Where derive reads differently from the plan's rules, the table shows it: a union as `untagged`, an optional nullable field without a helper, and a skipped bad value that derive refuses.
+- Allocation calls gate: each case at or under its baseline. Instructions, by the same callgrind toggle on `measured_decode`, only show; schema-emit gets its own `linux.sh` and `instructions.sh`.
+- Hand-written check mirrors stay out: this plan leaves checks unchanged.
+
+### cel-emit's `answer_rows`
+
+- Allocation calls and callgrind instructions. Today, at schema-emit 80aa62e:
   - Allocation calls: generated decode 50 vs reference 51.
   - callgrind instructions: decode 392k vs derive 242k vs interpreter 875k.
   - Command: in cel-emit, `cargo test -p cel-emit-cli --test references -- --no-capture`; instructions via `sh scripts/linux.sh sh scripts/instructions.sh`.
+- Before landing, cel-emit reads the local tree through `--config 'patch."https://github.com/nodeve-com/schema-emit".<crate>.path=...'` for `schema-emit` and `schema-emit-runtime`, its own code unchanged. This measures schema-emit's change apart from cel-emit's `PLANS/type-arguments.md`.
