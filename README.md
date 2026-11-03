@@ -2,7 +2,7 @@
 
 A **schema** describes what valid data looks like: which fields it has and which values it allows. schema-emit reads a [JSON Schema](https://json-schema.org) and writes Rust, for any caller:
 
-- **Standard Rust types.** A struct per model ([`emit::std_form::StdForm`]), its fields named from the schema, and a function reading a parsed `serde_json::Value` into it.
+- **Standard Rust types.** A struct per model ([`emit::std_form::StdForm`]), its fields named from the schema, and a function decoding JSON text into it.
 - **Checks over a value you already hold.** With your own structs, you say how to read each field ([`emit::Access`]).
 - **Models written elsewhere.** You can say another module holds a model ([`emit::std_form::StdForm::with_external`]).
 - **Common value types.** Timestamps and durations are `chrono`'s. `format: human-duration` reads an optional sign, then humantime's text, such as `1.5s`.
@@ -45,7 +45,7 @@ The `None` arm fails `absent` where fields can be absent. A value not finite or 
 
 In wasm32 the first model's check costs about 3.5 KB and each further one under 1 KB, with no imports.
 
-Why a written decode function, not `#[derive(Deserialize)]`: a union takes its first branch whose check passes, `1.0` reads as a whole number, and a failure names its place, inside a union too.
+Why a written decode function, not `#[derive(Deserialize)]`: a union takes its first branch whose check passes, `1.0` reads as a whole number, and a failure names its place, inside a union too. Like derive, it reads JSON text directly.
 
 ## Features
 
@@ -65,7 +65,7 @@ Why a written decode function, not `#[derive(Deserialize)]`: a union takes its f
 
 [`emit::std_form::fields`] gives each schema name's Rust name, for an embedder writing its own types.
 
-[`emit::std_form::StdForm`] names each struct by a function you pass, such as [`emit::std_form::names`]. A field's name is in snake case, its type `T` where required, else `Option<T>`. A `Box` wraps only a field whose type holds its own model. A union is an enum of its branches, named by its `$defs` key, else its branches' types joined by `Or`. A `decode_<name>` failure names where, as `Model.field[2].key`. A union decodes as the first branch whose check passes, else the first that decodes, else fails as the one the value fit furthest.
+[`emit::std_form::StdForm`] names each struct by a function you pass, such as [`emit::std_form::names`]. A field's name is in snake case, its type `T` where required, else `Option<T>`. A `Box` wraps only a field whose type holds its own model. A union is an enum of its branches, named by its `$defs` key, else its branches' types joined by `Or`. A `decode_<name>` failure names where, as `Model.field[2].key`. A union decodes each branch from its value's text, taking the first whose check passes, else the first that decodes, else fails as the one the value fit furthest.
 
 ## Conventions
 

@@ -1,6 +1,6 @@
 # schema-emit-runtime
 
-What the Rust that `schema-emit` writes links: the [`Reason`] a failure has, the [`Report`] failures go to, [`Failures`], which keeps the first of them, and [`Holds`], which keeps only whether any came. Being `no_std`, with one dependency, pattern-emit's search side, and no allocator of its own, it builds into whatever module or binary the emitted check lands in. The `decode` feature adds `decode`, which needs `std`: readers of a `serde_json::Value` for the decode functions schema-emit writes, and `Unfit`, naming where and why one fails.
+What the Rust that `schema-emit` writes links: the [`Reason`] a failure has, the [`Report`] failures go to, [`Failures`], which keeps the first of them, and [`Holds`], which keeps only whether any came. Being `no_std`, with one dependency, pattern-emit's search side, and no allocator of its own, it builds into whatever module or binary the emitted check lands in. The `decode` feature adds `decode`, which needs `std`: readers of JSON text for the decode functions schema-emit writes, and `Unfit`, naming where and why one fails.
 
 ## Why
 
