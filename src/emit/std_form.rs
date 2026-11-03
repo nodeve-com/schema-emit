@@ -1,13 +1,4 @@
-//! Values as standard Rust, for use anywhere: a model a struct the embedder names, its fields
-//! named from the schema. A required field is `T`, an optional one `Option<T>`; a
-//! nullable type is an `Option` too. A number keeps its width: an integer is the Rust integer of
-//! its name, a float `f32` or `f64`; text `String`, bytes `Vec<u8>`, a timestamp
-//! `chrono::DateTime<chrono::Utc>`, a duration `chrono::TimeDelta`; a list `Vec`; keys no field
-//! names, and a map, a `Vec<(String, _)>` of pairs. A field whose type holds its own model is boxed, no other. A
-//! value of any kind is a `serde_json::Value`, a null a `()`. A union is an enum, a variant per
-//! branch (`std_form/unions.rs`). [`StdForm`] is the [`Access`] to it, and writes beside each
-//! struct a serde `Deserialize` impl (`std_form/decode.rs`) and the function `decode_<name>`
-//! over it.
+#![doc = include_str!("../../STD_FORM.md")]
 
 use std::fmt::Write as _;
 
