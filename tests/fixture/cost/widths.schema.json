@@ -1,0 +1,1 @@
+{"type": "object", "properties": {"a": {"type": "integer", "format": "int8"}, "b": {"type": "integer", "format": "uint16"}, "c": {"type": "integer", "format": "int32"}, "d": {"type": "integer", "format": "uint64"}, "e": {"type": "integer", "format": "int64"}, "f": {"type": "number", "format": "float"}, "g": {"type": "number"}}, "required": ["a", "b", "c", "d", "e", "f", "g"]}

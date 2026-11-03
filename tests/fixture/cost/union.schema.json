@@ -1,0 +1,1 @@
+{"$ref": "#/$defs/Holder", "$defs": {"Holder": {"type": "object", "properties": {"pick": {"$ref": "#/$defs/Pick"}}, "required": ["pick"]}, "Pick": {"anyOf": [{"$ref": "#/$defs/A"}, {"$ref": "#/$defs/B"}]}, "A": {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}, "B": {"type": "object", "properties": {"b": {"type": "string"}}, "required": ["b"]}}}

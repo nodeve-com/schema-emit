@@ -1,0 +1,14 @@
+absent_optional	0
+array_of_models	5
+bad_optional	7
+depth	251
+escaped_strings	4
+nested	1
+nullable	0
+open_model	0
+optional	1
+optional_nullable	1
+timestamp	0
+union	2
+wide_integers	0
+widths	0

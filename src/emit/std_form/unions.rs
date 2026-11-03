@@ -76,7 +76,8 @@ impl StdForm<'_> {
             let _ = write!(out, "{name}({}), ", self.ty(v, None));
         }
         format!(
-            "#[derive(Debug, Clone, PartialEq)] #[allow(dead_code)] pub enum {} {{ {out}}}\n",
+            "{} #[allow(dead_code)] pub enum {} {{ {out}}}\n",
+            self.derives(),
             self.union_name(union)
         )
     }

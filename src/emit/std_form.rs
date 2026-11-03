@@ -30,6 +30,9 @@ pub struct StdForm<'a> {
     /// The path of the module holding model `i`'s struct and `read_` function, where another
     /// crate writes them; none is written here.
     pub external: &'a dyn Fn(usize) -> Option<String>,
+    /// The paths of derive macros each struct and enum also derives, beyond `Debug`, `Clone`, and
+    /// `PartialEq`.
+    pub derive: &'a [&'a str],
 }
 
 /// No model written elsewhere.
@@ -98,12 +101,24 @@ impl<'a> StdForm<'a> {
             schema,
             name,
             external: &local,
+            derive: &[],
         }
     }
 
     /// This form, its models `external` names written in those modules.
     pub fn with_external(self, external: &'a dyn Fn(usize) -> Option<String>) -> Self {
         StdForm { external, ..self }
+    }
+
+    /// This form, its structs and enums also deriving `derive`.
+    pub fn with_derive(self, derive: &'a [&'a str]) -> Self {
+        StdForm { derive, ..self }
+    }
+
+    /// The derive attribute of a struct or an enum.
+    fn derives(&self) -> String {
+        let extra: String = self.derive.iter().map(|d| format!(", {d}")).collect();
+        format!("#[derive(Debug, Clone, PartialEq{extra})]")
     }
 
     /// Model `m`'s struct, through its module where another crate writes it.
@@ -204,6 +219,12 @@ impl<'a> StdForm<'a> {
         Ok(out)
     }
 
+    /// Each model's struct, after the enums of the unions they hold, without the functions
+    /// decoding them.
+    pub fn types(&self) -> String {
+        self.structs()
+    }
+
     /// Each model's struct, after the enums of the unions they hold.
     fn structs(&self) -> String {
         let mut out = self.union_items();
@@ -213,7 +234,8 @@ impl<'a> StdForm<'a> {
             }
             let _ = writeln!(
                 out,
-                "#[derive(Debug, Clone, PartialEq)] #[allow(dead_code)] pub struct {} {{ {}}}",
+                "{} #[allow(dead_code)] pub struct {} {{ {}}}",
+                self.derives(),
                 (self.name)(i),
                 self.struct_fields(i, m)
             );
