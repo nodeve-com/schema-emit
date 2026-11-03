@@ -68,20 +68,7 @@ impl StdForm<'_> {
             None => String::new(),
         };
         if m.is_value() {
-            let init = m
-                .fields
-                .iter()
-                .zip(&names.fields)
-                .fold(String::new(), |mut s, (f, n)| {
-                    let read = format!("{}?", self.dec(&f.ty, Some(i), "v", 0));
-                    let read = if f.required {
-                        read
-                    } else {
-                        format!("Some({read})")
-                    };
-                    let _ = write!(s, "{n}: {read}, ");
-                    s
-                });
+            let init = self.value_fields(i, m, &names.fields);
             let empty = others("::std::collections::BTreeMap::new()".into());
             return (String::new(), init + &empty, String::new());
         }
@@ -89,12 +76,12 @@ impl StdForm<'_> {
         let keys = format!("&[{}]", keys.join(", "));
         let mut init = String::new();
         for (f, n) in m.fields.iter().zip(&names.fields) {
-            let read = self.dec(&f.ty, Some(i), "x0", 1);
+            let read = self.dec(&f.ty, Some(i), 1);
             let how = if f.required { "field" } else { "optional" };
             let _ = write!(init, "{n}: {}(o, {:?}, |x0| {read})?, ", d(how), f.name);
         }
         let rest = m.others.as_ref().map(|held| {
-            let read = self.dec(held, None, "x0", 1);
+            let read = self.dec(held, None, 1);
             format!("{}(o, {keys}, |x0| {read})?", d("rest"))
         });
         let tail = match rest {
@@ -105,21 +92,36 @@ impl StdForm<'_> {
         (format!("let o = {}(v)?; ", d("object")), init, tail)
     }
 
-    /// An expression of `Result<T, Unfit>`: `v`, a `&Value`, read as `ty`, a field of model
+    /// The fields of a model that is one value, each read from that value.
+    fn value_fields(&self, i: usize, m: &Model, names: &[String]) -> String {
+        let mut init = String::new();
+        for (f, n) in m.fields.iter().zip(names) {
+            let read = format!("{}?", self.dec(&f.ty, Some(i), 0));
+            let read = if f.required {
+                read
+            } else {
+                format!("Some({read})")
+            };
+            let _ = write!(init, "{n}: {read}, ");
+        }
+        init
+    }
+
+    /// An expression of `Result<T, Unfit>`: the value at `depth` read as `ty`, a field of model
     /// `owner` where it is one. `depth` numbers the names a closure binds.
-    pub(super) fn dec(&self, ty: &Ty, owner: Option<usize>, v: &str, depth: usize) -> String {
+    pub(super) fn dec(&self, ty: &Ty, owner: Option<usize>, depth: usize) -> String {
         if !ty.nullable {
-            return self.dec_base(ty, owner, v, depth);
+            return self.dec_base(ty, owner, depth);
         }
         let x = format!("x{depth}");
-        let inner = self.dec_base(ty, owner, &x, depth.saturating_add(1));
-        format!("{}({v}, |{x}| {inner})", d("nullable"))
+        let inner = self.dec_base(ty, owner, depth.saturating_add(1));
+        format!("{}({}, |{x}| {inner})", d("nullable"), bound(depth))
     }
 
     /// [`StdForm::dec`] of a type that isn't nullable.
-    fn dec_base(&self, ty: &Ty, owner: Option<usize>, v: &str, depth: usize) -> String {
+    fn dec_base(&self, ty: &Ty, owner: Option<usize>, depth: usize) -> String {
+        let v = bound(depth);
         let read = |name: &str| format!("{}({v})", d(name));
-        let next = depth.saturating_add(1);
         let boxed = |expr: String, boxes: bool| match boxes {
             true => format!("{expr}.map(Box::new)"),
             false => expr,
@@ -135,18 +137,8 @@ impl StdForm<'_> {
             Base::Timestamp => read("timestamp"),
             Base::Duration => read("duration"),
             Base::Bytes => read("bytes"),
-            Base::List(item) | Base::Map(item) => {
-                let how = if matches!(ty.base, Base::List(_)) {
-                    "list"
-                } else {
-                    "map"
-                };
-                let item = self.dec(item, None, &format!("x{depth}"), next);
-                format!("{}({v}, |x{depth}| {item})", d(how))
-            }
-            Base::Tuple { prefix, rest } => {
-                self.dec_tuple(prefix, rest.as_deref(), owner, v, depth)
-            }
+            Base::List(item) | Base::Map(item) => self.dec_items(ty, item, depth),
+            Base::Tuple { .. } => self.dec_tuple(ty, owner, depth),
             Base::Union(u) => {
                 let call = format!("read_{}({v})", idents::snake(&self.union_name(u)));
                 boxed(call, owner.is_some_and(|o| self.boxes(u, o)))
@@ -159,16 +151,23 @@ impl StdForm<'_> {
         }
     }
 
-    /// A tuple read in a closure that may refuse: its items from the array `v`, a position each,
-    /// then the list of the items past them.
-    fn dec_tuple(
-        &self,
-        prefix: &[Ty],
-        rest: Option<&Ty>,
-        owner: Option<usize>,
-        v: &str,
-        depth: usize,
-    ) -> String {
+    /// A list or map of `item` read in a closure: each item or entry value read as `item`.
+    fn dec_items(&self, ty: &Ty, item: &Ty, depth: usize) -> String {
+        let how = if matches!(ty.base, Base::List(_)) {
+            "list"
+        } else {
+            "map"
+        };
+        let item = self.dec(item, None, depth.saturating_add(1));
+        format!("{}({}, |x{depth}| {item})", d(how), bound(depth))
+    }
+
+    /// A tuple read in a closure that may refuse: its items from the array at `depth`, a position
+    /// each, then the list of the items past them.
+    fn dec_tuple(&self, ty: &Ty, owner: Option<usize>, depth: usize) -> String {
+        let Base::Tuple { prefix, rest } = &ty.base else {
+            return String::new();
+        };
         let (xs, x, next) = (
             format!("xs{depth}"),
             format!("x{depth}"),
@@ -176,13 +175,13 @@ impl StdForm<'_> {
         );
         let mut parts: Vec<String> = Vec::new();
         for (i, p) in prefix.iter().enumerate() {
-            let read = self.dec(p, owner, &x, next);
+            let read = self.dec(p, owner, next);
             parts.push(format!("{}({xs}, {i}, |{x}| {read})?", d("element")));
         }
         let mut fixed = String::new();
         match rest {
             Some(item) => {
-                let read = self.dec(item, None, &x, next);
+                let read = self.dec(item, None, next);
                 parts.push(format!(
                     "{}({xs}, {}, |{x}| {read})?",
                     d("tail"),
@@ -192,10 +191,20 @@ impl StdForm<'_> {
             None => fixed = format!("{}({xs}, {})?; ", d("fixed"), prefix.len()),
         }
         format!(
-            "(|| -> Result<_, {}> {{ let {xs} = {}({v})?.as_slice(); {fixed}Ok({}) }})()",
+            "(|| -> Result<_, {}> {{ let {xs} = {}({})?.as_slice(); {fixed}Ok({}) }})()",
             d("Unfit"),
             d("array"),
+            bound(depth),
             tuple_of(&parts)
         )
+    }
+}
+
+/// The name the value at `depth` is bound to: the function's own at the root, else the closure
+/// above it binds it.
+fn bound(depth: usize) -> String {
+    match depth.checked_sub(1) {
+        Some(above) => format!("x{above}"),
+        None => "v".into(),
     }
 }

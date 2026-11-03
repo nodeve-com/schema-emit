@@ -41,19 +41,7 @@ fn scope(lower: &Lower, s: &Map<String, Value>, depth: usize) -> Result<Evaluate
         Some(Value::Object(p)) => p.keys().cloned().collect(),
         _ => Vec::new(),
     };
-    if let Some(target) = s.get("$ref") {
-        let def = target
-            .as_str()
-            .and_then(|t| lower.definition(t))
-            .and_then(Value::as_object)
-            .filter(|_| depth < DEPTH)
-            .ok_or_else(|| Error::unsupported("`unevaluatedProperties` beside this `$ref`"))?;
-        match names_of(lower, def, depth)? {
-            None => return Ok(Evaluated::Everything),
-            Some(n) => names.extend(n),
-        }
-    }
-    for sub in all_of(s) {
+    for sub in referenced(lower, s, depth)?.into_iter().chain(all_of(s)) {
         match names_of(lower, sub, depth)? {
             None => return Ok(Evaluated::Everything),
             Some(n) => names.extend(n),
@@ -73,4 +61,22 @@ fn scope(lower: &Lower, s: &Map<String, Value>, depth: usize) -> Result<Evaluate
     names.sort();
     names.dedup();
     Ok(Evaluated::Names(names))
+}
+
+/// The definition a `$ref` of `s` names, if it has one: a scope reads it too.
+fn referenced<'a>(
+    lower: &'a Lower,
+    s: &Map<String, Value>,
+    depth: usize,
+) -> Result<Option<&'a Map<String, Value>>, Error> {
+    let Some(target) = s.get("$ref") else {
+        return Ok(None);
+    };
+    target
+        .as_str()
+        .and_then(|t| lower.definition(t))
+        .and_then(Value::as_object)
+        .filter(|_| depth < DEPTH)
+        .map(Some)
+        .ok_or_else(|| Error::unsupported("`unevaluatedProperties` beside this `$ref`"))
 }

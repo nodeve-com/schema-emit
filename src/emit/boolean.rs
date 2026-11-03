@@ -2,16 +2,19 @@
 //! types it as it chooses, and only the checks that need no view apply: `Not` of such a type,
 //! and an empty choice, which fails every value.
 
-use super::{guard, At, Emitter};
+use super::{guard, Walk};
 use crate::ir::{Base, Check, Ty};
 use crate::Error;
 
-pub(super) fn value(e: &Emitter, at: &mut At, ty: &Ty) -> Result<String, Error> {
-    if !ty.checks.iter().all(viewless) {
-        return Err(Error::unsupported(format!("checks on {:?}", ty.base)));
+impl Walk<'_, '_> {
+    /// The checks on a value of any kind: those that need no view.
+    pub(super) fn any(&self, ty: &Ty) -> Result<String, Error> {
+        if !ty.checks.iter().all(viewless) {
+            return Err(Error::unsupported(format!("checks on {:?}", ty.base)));
+        }
+        let conds = self.e.conds(&Base::Any, &ty.checks, "")?;
+        Ok(guard(&self.at, &conds))
     }
-    let conds = e.conds(&Base::Any, &ty.checks, "")?;
-    Ok(guard(at, &conds))
 }
 
 /// Whether `check` needs no view: `Not` of a viewless type, or a choice with no literal.

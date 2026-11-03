@@ -5,18 +5,21 @@
 //! a pattern its guard or cap refuses is unsupported, and a table that proves unusable at run
 //! time fails `range`. The check's `_load` function checks its tables ahead of any value.
 
-use super::{guard, readable, At, Emitter};
+use super::{guard, readable, Emitter, Walk};
 use crate::ir::{Base, Check, Count, Ty};
 use crate::Error;
 
-pub(super) fn text(e: &Emitter, at: &mut At, value: &str, ty: &Ty) -> Result<String, Error> {
-    let view = at.local("t");
-    let conds = e.conds(&ty.base, &ty.checks, &view)?;
-    if conds.is_empty() {
-        return Ok(String::new());
+impl Walk<'_, '_> {
+    /// The checks on `value`, a `&` of text's Rust, through its `&str` view.
+    pub(super) fn text(&mut self, value: &str, ty: &Ty) -> Result<String, Error> {
+        let view = self.at.local("t");
+        let conds = self.e.conds(&ty.base, &ty.checks, &view)?;
+        if conds.is_empty() {
+            return Ok(String::new());
+        }
+        let body = guard(&self.at, &conds);
+        Ok(readable(&self.at, &self.e.access.text(value), &view, &body))
     }
-    let body = guard(at, &conds);
-    Ok(readable(at, &e.access.text(value), &view, &body))
 }
 
 pub(super) fn cond(

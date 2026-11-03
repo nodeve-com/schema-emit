@@ -19,7 +19,7 @@ impl StdForm<'_> {
         let mut out = Emitter::new(self.schema, self).check_union(union, &ok)?;
         let mut arms = String::new();
         for (i, variant) in union.variants.iter().enumerate() {
-            let read = self.dec(variant, None, "v", 0);
+            let read = self.dec(variant, None, 0);
             let held = self.variant_of(union, i, "x");
             arms.push_str(&format!(
                 "match {read} {{ Ok(x) => {{ let c = {held}; \

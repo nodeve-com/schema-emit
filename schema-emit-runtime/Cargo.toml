@@ -14,6 +14,7 @@ indexing_slicing = "deny"
 arithmetic_side_effects = "deny"
 struct_excessive_bools = "deny"
 fn_params_excessive_bools = "deny"
+too_many_lines = "warn"
 
 [features]
 # Decoding a `serde_json::Value` into the std form: the one part that needs an allocator.

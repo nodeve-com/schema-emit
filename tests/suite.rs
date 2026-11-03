@@ -15,15 +15,18 @@
 
 #[path = "suite/files.rs"]
 mod files;
+#[path = "suite/judge.rs"]
+mod judge;
 #[path = "suite/run.rs"]
 mod run;
 #[path = "suite/typed.rs"]
 mod typed;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use files::{departures, fixture, stem};
+use files::{fixture, stem};
+use judge::judge;
 
 use schema_emit::ir::{Field, Model, Schema};
 use schema_emit::json_schema;
@@ -53,64 +56,83 @@ struct Instance {
 #[test]
 fn the_suite_passes_its_baseline() {
     let only = std::env::var("SUITE").ok();
+    let files = suite_files(only.as_deref());
+    assert!(!files.is_empty(), "no suite file named {only:?}");
+    let mut instances = Vec::new();
+    let mut modules = Vec::new();
+    for path in &files {
+        instances.extend(file_instances(path, &mut modules));
+    }
+    let outcomes = run::run(&modules);
+    let checked = settle(&mut instances, &outcomes);
+    judge(&instances, &checked, &files);
+}
+
+/// The suite's case files, `only` the one it names, in order.
+fn suite_files(only: Option<&str>) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = ["JSON-Schema-Test-Suite", "cases"]
         .iter()
         .flat_map(|d| std::fs::read_dir(fixture().join(d)).unwrap())
         .map(|e| e.unwrap().path())
         .filter(|p| p.extension().is_some_and(|x| x == "json"))
-        .filter(|p| only.as_deref().is_none_or(|o| stem(p) == o))
+        .filter(|p| only.is_none_or(|o| stem(p) == o))
         .collect();
     files.sort();
-    assert!(!files.is_empty(), "no suite file named {only:?}");
+    files
+}
 
-    let mut instances = Vec::new();
-    let mut modules = Vec::new();
-    for path in &files {
-        let groups: Vec<Value> =
-            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        let mut seen = BTreeMap::new();
-        for group in &groups {
-            for test in group["tests"].as_array().unwrap() {
-                let mut name = format!(
-                    "{}/{}",
-                    group["description"].as_str().unwrap(),
-                    test["description"].as_str().unwrap()
-                );
-                let n = seen.entry(name.clone()).or_insert(0);
-                *n += 1;
-                if *n > 1 {
-                    name = format!("{name}#{n}");
-                }
-                let failures = test.get("failures").map(|f| {
-                    f.as_array()
-                        .unwrap()
-                        .iter()
-                        .map(|x| x.as_str().unwrap().to_string())
-                        .collect()
-                });
-                let verdict = match prepare(&group["schema"], &test["data"]) {
-                    Ok(case) => match run::module(modules.len(), &case) {
-                        Ok(m) => {
-                            modules.push((modules.len(), m));
-                            Verdict::Built(modules.len() - 1)
-                        }
-                        Err(e) => Verdict::Unsupported(e.to_string()),
-                    },
-                    Err(v) => v,
-                };
-                instances.push(Instance {
-                    file: stem(path),
-                    name,
-                    valid: test["valid"].as_bool().unwrap(),
-                    failures,
-                    verdict,
-                });
+/// Each instance of the case file `path`; those that build add their module to `modules`.
+fn file_instances(path: &PathBuf, modules: &mut Vec<(usize, String)>) -> Vec<Instance> {
+    let groups: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut seen = BTreeMap::new();
+    let mut out = Vec::new();
+    for group in &groups {
+        for test in group["tests"].as_array().unwrap() {
+            let mut name = format!(
+                "{}/{}",
+                group["description"].as_str().unwrap(),
+                test["description"].as_str().unwrap()
+            );
+            let n = seen.entry(name.clone()).or_insert(0);
+            *n += 1;
+            if *n > 1 {
+                name = format!("{name}#{n}");
             }
+            let failures = test.get("failures").map(|f| {
+                let names = f.as_array().unwrap().iter();
+                names.map(|x| x.as_str().unwrap().to_string()).collect()
+            });
+            out.push(Instance {
+                file: stem(path),
+                name,
+                valid: test["valid"].as_bool().unwrap(),
+                failures,
+                verdict: build(&group["schema"], &test["data"], modules),
+            });
         }
     }
-    let outcomes = run::run(&modules);
+    out
+}
+
+/// The verdict of building one instance's module, added to `modules` where it builds.
+fn build(schema: &Value, data: &Value, modules: &mut Vec<(usize, String)>) -> Verdict {
+    let case = match prepare(schema, data) {
+        Ok(case) => case,
+        Err(v) => return v,
+    };
+    match run::module(modules.len(), &case) {
+        Ok(m) => {
+            modules.push((modules.len(), m));
+            Verdict::Built(modules.len() - 1)
+        }
+        Err(e) => Verdict::Unsupported(e.to_string()),
+    }
+}
+
+/// Turns each built instance that didn't decode into its verdict; gives those that did.
+fn settle(instances: &mut [Instance], outcomes: &BTreeMap<usize, run::Outcome>) -> Checked {
     let mut checked = Checked::new();
-    for i in &mut instances {
+    for i in instances {
         let Verdict::Built(n) = i.verdict else {
             continue;
         };
@@ -123,7 +145,7 @@ fn the_suite_passes_its_baseline() {
             run::Outcome::Other => Verdict::NotApplicable("no std value holds it".into()),
         };
     }
-    judge(&instances, &checked, &files);
+    checked
 }
 
 /// The case for one instance, or why it has none.
@@ -138,9 +160,13 @@ fn prepare(schema: &Value, data: &Value) -> Result<run::Case, Verdict> {
         (s, m, data)
     } else {
         // Anything else is the one field of a model around it.
+        let doc = json_schema::Document {
+            schema: &schema,
+            shared: &none,
+            notes: NOTES,
+        };
         let (mut s, ty) =
-            json_schema::lower_ty("Value.value", &schema, &none, NOTES, Schema::default())
-                .map_err(unsupported)?;
+            json_schema::lower_ty("Value.value", &doc, Schema::default()).map_err(unsupported)?;
         s.models.push(Model {
             name: "Value".into(),
             fields: vec![Field {
@@ -162,137 +188,3 @@ fn prepare(schema: &Value, data: &Value) -> Result<run::Case, Verdict> {
 
 /// Each built case's verdict and failures, where it decoded.
 type Checked = BTreeMap<usize, (bool, Vec<String>)>;
-
-fn judge(instances: &[Instance], outcomes: &Checked, files: &[PathBuf]) {
-    let bless = std::env::var("SUITE_BLESS").is_ok();
-    let show = std::env::var("SUITE_SHOW").is_ok();
-    let departures = departures();
-    let mut passed: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
-    let mut counts: BTreeMap<&str, [usize; 4]> = BTreeMap::new();
-    let mut reasons: BTreeMap<String, usize> = BTreeMap::new();
-    let mut wrong = Vec::new();
-    for i in instances {
-        let slot = match &i.verdict {
-            Verdict::Built(n) => {
-                let (valid, failures) = &outcomes[n];
-                let departs = departures.contains(&format!("{}/{}", i.file, i.name));
-                let same = departs || i.failures.as_ref().is_none_or(|f| f == failures);
-                let right = (*valid != i.valid) == departs && same;
-                if right {
-                    passed.entry(&i.file).or_default().insert(&i.name);
-                    0
-                } else {
-                    wrong.push(format!(
-                        "{}/{}: expected {}{}, got {} {failures:?}",
-                        i.file,
-                        i.name,
-                        if i.valid { "valid" } else { "invalid" },
-                        i.failures
-                            .as_ref()
-                            .map_or(String::new(), |f| format!(" {f:?}")),
-                        if *valid { "valid" } else { "invalid" },
-                    ));
-                    2
-                }
-            }
-            // A refusal is invalid and lists no check failures: right only where the case says so.
-            Verdict::Refused(why)
-                if (!i.valid && i.failures.as_ref().is_none_or(Vec::is_empty))
-                    || departures.contains(&format!("{}/{}", i.file, i.name)) =>
-            {
-                passed.entry(&i.file).or_default().insert(&i.name);
-                *reasons.entry(format!("refused: {why}")).or_default() += 1;
-                0
-            }
-            Verdict::Refused(why) => {
-                wrong.push(format!(
-                    "{}/{}: expected {}{:?}, refused: {why}",
-                    i.file,
-                    i.name,
-                    if i.valid { "valid" } else { "invalid" },
-                    i.failures
-                ));
-                2
-            }
-            Verdict::Unsupported(why) => {
-                *reasons.entry(short(why)).or_default() += 1;
-                1
-            }
-            Verdict::NotApplicable(why) => {
-                *reasons.entry(format!("n/a: {why}")).or_default() += 1;
-                3
-            }
-        };
-        if show {
-            match &i.verdict {
-                Verdict::Unsupported(why) => println!("unsupported: {}/{}: {why}", i.file, i.name),
-                Verdict::NotApplicable(why) => println!("n/a: {}/{}: {why}", i.file, i.name),
-                Verdict::Refused(why) => println!("refused: {}/{}: {why}", i.file, i.name),
-                Verdict::Built(_) => {}
-            }
-        }
-        counts.entry(&i.file).or_default()[slot] += 1;
-    }
-    println!(
-        "{:<28} {:>5} {:>5} {:>5} {:>5}",
-        "file", "pass", "unsup", "wrong", "n/a"
-    );
-    for (file, [p, u, w, n]) in &counts {
-        println!("{file:<28} {p:>5} {u:>5} {w:>5} {n:>5}");
-    }
-    let mut top: Vec<(usize, String)> = reasons.into_iter().map(|(w, n)| (n, w)).collect();
-    top.sort_unstable_by(|a, b| b.cmp(a));
-    println!("reasons, most common first:");
-    for (n, why) in top.iter().take(30) {
-        println!("{n:>5} {why}");
-    }
-    for w in &wrong {
-        println!("wrong: {w}");
-    }
-
-    let mut lost = Vec::new();
-    let mut gained = Vec::new();
-    for path in files {
-        let file = stem(path);
-        let list = fixture().join("pass").join(format!("{file}.txt"));
-        let now: BTreeSet<&str> = passed.get(file.as_str()).cloned().unwrap_or_default();
-        if bless {
-            let text: String = now.iter().map(|n| format!("{n}\n")).collect();
-            if text.is_empty() {
-                let _ = std::fs::remove_file(&list);
-            } else {
-                std::fs::write(&list, text).unwrap();
-            }
-            continue;
-        }
-        let before: BTreeSet<String> = std::fs::read_to_string(&list)
-            .unwrap_or_default()
-            .lines()
-            .map(str::to_string)
-            .collect();
-        lost.extend(
-            before
-                .iter()
-                .filter(|b| !now.contains(b.as_str()))
-                .map(|b| format!("{file}/{b}")),
-        );
-        gained.extend(
-            now.iter()
-                .filter(|n| !before.contains(**n))
-                .map(|n| format!("{file}/{n}")),
-        );
-    }
-    assert!(wrong.is_empty(), "wrong, worse than refused: {wrong:#?}");
-    assert!(lost.is_empty(), "stopped passing:\n{lost:#?}");
-    assert!(
-        gained.is_empty(),
-        "newly passing; add them with SUITE_BLESS=1:\n{gained:#?}"
-    );
-}
-
-/// A reason without the schema path that starts it, so like reasons group.
-fn short(why: &str) -> String {
-    let kind = why.split_once(": ").map_or(why, |(k, _)| k);
-    let last = why.rsplit(": ").next().unwrap_or(why);
-    format!("{kind}: {last}")
-}

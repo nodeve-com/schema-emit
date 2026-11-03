@@ -4,7 +4,7 @@
 use serde_json::{Map, Value};
 
 use super::Target;
-use crate::ir::{Base, Ty};
+use crate::ir::{Base, Field, Model, Ty};
 use crate::json_schema::Lower;
 use crate::Error;
 
@@ -30,21 +30,40 @@ pub(super) fn only_notes(name: &str, s: &Map<String, Value>) -> Result<(), Error
     }
 }
 
-/// The recursion's model for `t`, made once while `t` is being followed.
-pub(super) fn recursion(
-    lower: &mut Lower,
-    name: &str,
-    t: &Target,
-    s: &Map<String, Value>,
-) -> Result<Ty, Error> {
-    only_notes(name, s)?;
-    let model = match lower.recursions.get(&t.key) {
-        Some(m) => *m,
-        None => {
-            let m = lower.reserve(name);
-            lower.recursions.insert(t.key.clone(), m);
-            m
-        }
-    };
-    Ok(Ty::of(Base::Model(model)))
+impl Lower {
+    /// The recursion's model for `t`, made once while `t` is being followed.
+    pub(in crate::json_schema) fn recursion(
+        &mut self,
+        name: &str,
+        t: &Target,
+        s: &Map<String, Value>,
+    ) -> Result<Ty, Error> {
+        only_notes(name, s)?;
+        let model = match self.recursions.get(&t.key) {
+            Some(m) => *m,
+            None => {
+                let m = self.reserve(name);
+                self.recursions.insert(t.key.clone(), m);
+                m
+            }
+        };
+        Ok(Ty::of(Base::Model(model)))
+    }
+
+    /// The recursion's model `model` filled with `ty`, the target it stands for, as the one field
+    /// of a model named `name`; the type referring to it.
+    pub(in crate::json_schema) fn wrap(&mut self, name: &str, ty: Ty, model: usize) -> Ty {
+        let field = Field {
+            name: String::new(),
+            ty,
+            required: true,
+        };
+        let wrapped = Model {
+            name: name.into(),
+            fields: vec![field],
+            ..Model::default()
+        };
+        self.fill(model, wrapped);
+        Ty::of(Base::Model(model))
+    }
 }

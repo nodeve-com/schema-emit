@@ -14,13 +14,14 @@
 
 mod kinds;
 mod meet;
+mod object;
 
 pub(super) use meet::ty_meet;
 
 use serde_json::{Map, Value};
 
-use super::{lists, models, Done, Key, Lower};
-use crate::ir::{Base, Check, Field, Ty};
+use super::{lists, Done, Key, Lower};
+use crate::ir::{Base, Check, Ty};
 use crate::Error;
 
 pub(super) fn keyword(k: &mut Key) -> Done {
@@ -32,7 +33,12 @@ pub(super) fn keyword(k: &mut Key) -> Done {
         Err(e) => return Some(Err(e)),
     };
     let closed = is_closed(k.lower, k.siblings);
-    Some(meet_all(k.lower, "allOf", k.ty, closed, &subs))
+    let mut meet = Meet {
+        name: "allOf",
+        ty: k.ty,
+        closed,
+    };
+    Some(k.lower.meet_all(&mut meet, &subs))
 }
 
 /// `s`, with no `type` and no `$ref`: its base is the first typed `allOf` subschema's, and the
@@ -66,7 +72,12 @@ pub(super) fn untyped(lower: &mut Lower, name: &str, s: &Map<String, Value>) -> 
         ty = own_model(lower, name, ty);
     }
     let closed = closed_value(lower, head);
-    meet_all(lower, name, &mut ty, closed, &rest)?;
+    let mut meet = Meet {
+        name,
+        ty: &mut ty,
+        closed,
+    };
+    lower.meet_all(&mut meet, &rest)?;
     Ok(ty)
 }
 
@@ -121,168 +132,87 @@ fn closed_value(lower: &Lower, v: &Value) -> bool {
     matches!(v, Value::Object(s) if is_closed(lower, s))
 }
 
-/// Meets each of `subs` into `ty`. `closed` says whether the schema `ty` came from holds no key
-/// beyond its fields.
-fn meet_all(
-    lower: &mut Lower,
-    name: &str,
-    ty: &mut Ty,
-    mut closed: bool,
-    subs: &[&Value],
-) -> Result<(), Error> {
-    for sub in subs {
-        match sub {
-            Value::Bool(true) => {}
-            Value::Bool(false) => {
-                if ty.base.is_structured() {
-                    return Err(Error::unsupported(format!(
-                        "{name}: `allOf` of `false` beside a list or an object"
-                    )));
-                }
-                ty.checks.push(Check::OneOf(Vec::new()));
-            }
-            Value::Object(s) => {
-                let sub_closed = is_closed(lower, s);
-                let object_sub = s.get("type").is_none_or(|t| t.as_str() == Some("object"));
-                if matches!(ty.base, Base::Model(_)) && object_sub && !s.contains_key("$ref") {
-                    merge_object(lower, name, ty, s, closed, sub_closed)?;
-                } else if is_typed(sub) {
-                    let st = lower.ty(name, sub)?;
-                    meet::into(lower, name, ty, st, closed, sub_closed)?;
-                } else if let Some(st) = untyped_sub(lower, name, ty, s)? {
-                    meet::into(lower, name, ty, st, closed, sub_closed)?;
-                }
-                closed |= sub_closed;
-            }
-            other => return Err(Error::invalid(format!("{name}: `allOf` holds {other}"))),
-        }
-    }
-    Ok(())
+/// A type other subschemas meet into: its name for errors, and whether the schema it came from
+/// holds no key beyond its fields.
+pub(super) struct Meet<'a> {
+    pub name: &'a str,
+    pub ty: &'a mut Ty,
+    pub closed: bool,
 }
 
-/// A subschema with no `type` or `$ref` under a list parent. Where it states items, the list
-/// it makes (`Some`, to meet); otherwise its keywords apply to the parent's type (`None`).
-fn untyped_sub(
-    lower: &mut Lower,
-    name: &str,
-    ty: &mut Ty,
-    s: &Map<String, Value>,
-) -> Result<Option<Ty>, Error> {
-    let items = s.contains_key("items") || s.contains_key("prefixItems");
-    if matches!(ty.base, Base::Tuple { .. }) && items {
-        return Err(Error::unsupported(format!(
-            "{name}: `allOf` of items beside a tuple"
-        )));
+impl Meet<'_> {
+    /// Meets `false`: nothing is valid, which a list or an object can't say.
+    fn deny(&mut self) -> Result<(), Error> {
+        if self.ty.base.is_structured() {
+            return Err(Error::unsupported(format!(
+                "{}: `allOf` of `false` beside a list or an object",
+                self.name
+            )));
+        }
+        self.ty.checks.push(Check::OneOf(Vec::new()));
+        Ok(())
     }
-    if matches!(ty.base, Base::List(_)) && items {
-        let base = lists::base(lower, name, s)?;
-        return Ok(Some(lower.keywords(name, s, Ty::of(base))?));
-    }
-    *ty = lower.keywords(name, s, ty.clone())?;
-    Ok(None)
 }
 
-/// An object subschema of an object parent. Its properties merge into the parent's fields by
-/// name: a field only one side names keeps its type, and a field both name meets its checks.
-/// Its other keywords then apply to the merged object.
-fn merge_object(
-    lower: &mut Lower,
-    name: &str,
-    ty: &mut Ty,
-    s: &Map<String, Value>,
-    closed: bool,
-    sub_closed: bool,
-) -> Result<(), Error> {
-    let Base::Model(i) = ty.base else {
-        return Err(Error::invalid(format!(
-            "{name}: `allOf` object on a non-object"
-        )));
-    };
-    let (required, props) = models::field_lists(name, s)?;
-    let names: Vec<String> = lower
-        .out
-        .models
-        .get(i)
-        .ok_or_else(|| Error::invalid(format!("{name}: no model {i}")))?
-        .fields
-        .iter()
-        .map(|f| f.name.clone())
-        .collect();
-    let has = |n: &str| names.iter().any(|f| f.as_str() == n);
-    if closed {
-        if let Some(k) = props.keys().find(|k| !has(k)) {
-            return Err(Error::unsupported(format!(
-                "{name}: `allOf` adds `{k}`, which a closed object doesn't name"
-            )));
-        }
-    }
-    if sub_closed {
-        if let Some(n) = names.iter().find(|n| !props.contains_key(n.as_str())) {
-            return Err(Error::unsupported(format!(
-                "{name}: a closed subschema doesn't name `{n}`, which another subschema gives"
-            )));
-        }
-    }
-    if let Some(r) = required
-        .iter()
-        .find(|r| !props.contains_key(r.as_str()) && !has(r.as_str()))
-    {
-        return Err(Error::unsupported(format!(
-            "{name}: `required` names `{r}`, which no field holds"
-        )));
-    }
-    if !sub_closed
-        && (s.contains_key("minProperties")
-            || s.contains_key("maxProperties")
-            || s.contains_key("dependentRequired"))
-    {
-        return Err(Error::unsupported(format!(
-            "{name}: a count or `dependentRequired` on an open object in `allOf`"
-        )));
-    }
-    for (k, p) in &props {
-        let field = format!("{name}.{k}");
-        match names.iter().position(|n| n == k) {
-            Some(at) => {
-                let mut fty = lower
-                    .out
-                    .models
-                    .get(i)
-                    .and_then(|m| m.fields.get(at))
-                    .map(|f| f.ty.clone())
-                    .ok_or_else(|| Error::invalid(format!("{field}: no field")))?;
-                if matches!(fty.base, Base::Model(_)) {
-                    return Err(Error::unsupported(format!(
-                        "{field}: `allOf` gives an object property both subschemas name"
-                    )));
-                }
-                meet_all(lower, &field, &mut fty, false, &[p])?;
-                if let Some(f) = lower
-                    .out
-                    .models
-                    .get_mut(i)
-                    .and_then(|m| m.fields.get_mut(at))
-                {
-                    f.ty = fty;
-                }
-            }
-            None => {
-                let fty = lower.ty(&field, p)?;
-                if let Some(m) = lower.out.models.get_mut(i) {
-                    m.fields.push(Field {
-                        name: k.clone(),
-                        ty: fty,
-                        required: false,
-                    });
+impl Lower {
+    /// Meets each of `subs` into `meet`.
+    pub(super) fn meet_all(&mut self, meet: &mut Meet, subs: &[&Value]) -> Result<(), Error> {
+        for sub in subs {
+            match sub {
+                Value::Bool(true) => {}
+                Value::Bool(false) => meet.deny()?,
+                Value::Object(s) => self.meet_object(meet, sub, s)?,
+                other => {
+                    return Err(Error::invalid(format!(
+                        "{}: `allOf` holds {other}",
+                        meet.name
+                    )))
                 }
             }
         }
+        Ok(())
     }
-    if let Some(m) = lower.out.models.get_mut(i) {
-        for f in &mut m.fields {
-            f.required |= required.contains(&f.name);
+
+    /// One object subschema `sub`, whose keywords are `s`, met into `meet`.
+    fn meet_object(
+        &mut self,
+        meet: &mut Meet,
+        sub: &Value,
+        s: &Map<String, Value>,
+    ) -> Result<(), Error> {
+        let sub_closed = is_closed(self, s);
+        let object_sub = s.get("type").is_none_or(|t| t.as_str() == Some("object"));
+        if matches!(meet.ty.base, Base::Model(_)) && object_sub && !s.contains_key("$ref") {
+            self.merge_object(meet, s)?;
+        } else if is_typed(sub) {
+            let st = self.ty(meet.name, sub)?;
+            self.into(meet, st, sub_closed)?;
+        } else if let Some(st) = self.untyped_sub(meet, s)? {
+            self.into(meet, st, sub_closed)?;
         }
+        meet.closed |= sub_closed;
+        Ok(())
     }
-    *ty = lower.keywords(name, s, ty.clone())?;
-    Ok(())
+
+    /// A subschema with no `type` or `$ref` under a list parent. Where it states items, the list
+    /// it makes (`Some`, to meet); otherwise its keywords apply to the parent's type (`None`).
+    fn untyped_sub(
+        &mut self,
+        meet: &mut Meet,
+        s: &Map<String, Value>,
+    ) -> Result<Option<Ty>, Error> {
+        let name = meet.name;
+        let items = s.contains_key("items") || s.contains_key("prefixItems");
+        if matches!(meet.ty.base, Base::Tuple { .. }) && items {
+            return Err(Error::unsupported(format!(
+                "{name}: `allOf` of items beside a tuple"
+            )));
+        }
+        if matches!(meet.ty.base, Base::List(_)) && items {
+            let base = lists::base(self, name, s)?;
+            return Ok(Some(self.keywords(name, s, Ty::of(base))?));
+        }
+        *meet.ty = self.keywords(name, s, meet.ty.clone())?;
+        Ok(None)
+    }
 }

@@ -54,6 +54,32 @@ pub fn module(n: usize, case: &Case) -> Result<String, Error> {
 pub fn run(modules: &[(usize, String)]) -> BTreeMap<usize, Outcome> {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("schema-emit-suite");
     std::fs::create_dir_all(dir.join("src")).unwrap();
+    write_project(&dir, modules);
+    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+    let built = Command::new(&cargo)
+        .args(["build", "--quiet", "--offline", "--manifest-path"])
+        .arg(dir.join("Cargo.toml"))
+        .env("CARGO_TARGET_DIR", dir.join("target"))
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "the emitted checks don't build:\n{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let out = Command::new(dir.join("target/debug/schema-emit-suite"))
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "the emitted checks failed to run");
+    String::from_utf8(out.stdout)
+        .unwrap()
+        .lines()
+        .map(outcome_of)
+        .collect()
+}
+
+/// Writes the program's manifest and source under `dir`.
+fn write_project(dir: &Path, modules: &[(usize, String)]) {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("schema-emit-runtime");
     std::fs::write(
         dir.join("Cargo.toml"),
@@ -77,43 +103,25 @@ pub fn run(modules: &[(usize, String)]) -> BTreeMap<usize, Outcome> {
     }
     main.push_str("}\n");
     std::fs::write(dir.join("src/main.rs"), main).unwrap();
-    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
-    let built = Command::new(&cargo)
-        .args(["build", "--quiet", "--offline", "--manifest-path"])
-        .arg(dir.join("Cargo.toml"))
-        .env("CARGO_TARGET_DIR", dir.join("target"))
-        .output()
-        .unwrap();
-    assert!(
-        built.status.success(),
-        "the emitted checks don't build:\n{}",
-        String::from_utf8_lossy(&built.stderr)
-    );
-    let out = Command::new(dir.join("target/debug/schema-emit-suite"))
-        .output()
-        .unwrap();
-    assert!(out.status.success(), "the emitted checks failed to run");
-    String::from_utf8(out.stdout)
-        .unwrap()
-        .lines()
-        .map(|line| {
-            let mut parts = line.split('\t');
-            let n = parts.next().unwrap().parse().unwrap();
-            let verdict = parts.next();
-            let text = parts.next().unwrap_or_default();
-            let failures = text
-                .split(';')
-                .filter(|f| !f.is_empty())
-                .map(str::to_string)
-                .collect();
-            let outcome = match verdict {
-                Some("kind") => Outcome::Kind,
-                Some("other") => Outcome::Other,
-                verdict => Outcome::Checked(verdict == Some("valid"), failures),
-            };
-            (n, outcome)
-        })
-        .collect()
+}
+
+/// The case number and outcome one line of the program's output gives.
+fn outcome_of(line: &str) -> (usize, Outcome) {
+    let mut parts = line.split('\t');
+    let n = parts.next().unwrap().parse().unwrap();
+    let verdict = parts.next();
+    let text = parts.next().unwrap_or_default();
+    let failures = text
+        .split(';')
+        .filter(|f| !f.is_empty())
+        .map(str::to_string)
+        .collect();
+    let outcome = match verdict {
+        Some("kind") => Outcome::Kind,
+        Some("other") => Outcome::Other,
+        verdict => Outcome::Checked(verdict == Some("valid"), failures),
+    };
+    (n, outcome)
 }
 
 /// What every program carries: an outcome from failures, and printing it.

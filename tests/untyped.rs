@@ -3,11 +3,19 @@
 
 use schema_emit::ir::Base;
 use schema_emit::ir::Schema;
-use schema_emit::json_schema::lower_ty;
+use schema_emit::json_schema::{lower_ty, Document};
 use serde_json::{json, Map, Value};
 
+fn document<'a>(schema: &'a Value, shared: &'a Map<String, Value>) -> Document<'a> {
+    Document {
+        schema,
+        shared,
+        notes: &[],
+    }
+}
+
 fn lowered(schema: &Value) -> Result<(Base, bool), String> {
-    lower_ty("V", schema, &Map::new(), &[], Schema::default())
+    lower_ty("V", &document(schema, &Map::new()), Schema::default())
         .map(|(_, ty)| (ty.base, ty.nullable))
         .map_err(|e| e.to_string())
 }
@@ -50,7 +58,7 @@ fn an_untyped_allof_over_a_typed_object_with_properties_is_an_object() {
         "properties": {"id": {"type": "string"}},
         "unevaluatedProperties": false
     });
-    let (schema, ty) = lower_ty("V", &s, &Map::new(), &[], Schema::default()).unwrap();
+    let (schema, ty) = lower_ty("V", &document(&s, &Map::new()), Schema::default()).unwrap();
     let Base::Model(i) = ty.base else {
         panic!("not a model")
     };

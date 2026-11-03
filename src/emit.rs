@@ -24,6 +24,7 @@ mod text;
 mod tuples;
 mod unevaluated;
 mod unions;
+mod walk;
 
 use std::cell::{Cell, RefCell};
 use std::fmt::Write as _;
@@ -31,6 +32,7 @@ use std::fmt::Write as _;
 use crate::ir::{Base, Check, Lit, Model, Schema, Ty, Union};
 use crate::Error;
 use at::At;
+use walk::Walk;
 
 /// The runtime crate, as the emitted code names it: the embedder writes `use ::schema_emit_runtime as
 /// s;` beside it.
@@ -91,14 +93,18 @@ pub struct Emitter<'a> {
     ids: Cell<usize>,
 }
 
-impl Emitter<'_> {
-    /// Model `model` and its Rust type.
-    fn parts(&self, model: usize) -> Result<(&Model, String), Error> {
-        let m = self
-            .schema
+impl<'a> Emitter<'a> {
+    /// Model `model`.
+    fn model(&self, model: usize) -> Result<&'a Model, Error> {
+        self.schema
             .models
             .get(model)
-            .ok_or_else(|| Error::invalid(format!("no model {model}")))?;
+            .ok_or_else(|| Error::invalid(format!("no model {model}")))
+    }
+
+    /// Model `model` and its Rust type.
+    fn parts(&self, model: usize) -> Result<(&'a Model, String), Error> {
+        let m = self.model(model)?;
         let rust = self.access.rust(self.schema, &Ty::of(Base::Model(model)))?;
         Ok((m, rust))
     }
@@ -107,7 +113,7 @@ impl Emitter<'_> {
     fn model_check(&self, model: usize, name: &str) -> Result<String, Error> {
         if self.cyclic(model) {
             let (m, rust) = self.parts(model)?;
-            if let Some(call) = recursion::marked(self, &At::new(&m.name), "v", model)? {
+            if let Some(call) = Walk::new(self, &m.name).marked("v", model)? {
                 return Ok(format!(
                     "pub fn {name}<R: {STD}::Report>(v: &{rust}, r: &mut R) {{\n{call}}}\n"
                 ));
@@ -117,108 +123,13 @@ impl Emitter<'_> {
     }
 
     pub(super) fn plain_check(&self, model: usize, name: &str) -> Result<String, Error> {
-        let (m, rust) = self.parts(model)?;
+        let m = self.model(model)?;
         self.root.set(Some(model));
         let root = Ty {
             checks: m.checks.clone(),
             ..Ty::of(Base::Model(model))
         };
-        self.function(name, &rust, &m.name, &root)
-    }
-
-    /// The checks on `value`, a `&` of `ty`'s Rust. A nullable value is an `Option`: a present
-    /// value meets the checks, and null meets only the choices that admit it.
-    fn value(&self, at: &mut At, value: &str, ty: &Ty) -> Result<String, Error> {
-        if !ty.nullable {
-            return self.present(at, value, ty);
-        }
-        let inner = at.local("y");
-        let present = self.present(at, &inner, ty)?;
-        let absent = null(at, ty);
-        Ok(format!(
-            "match {value} {{ Some({inner}) => {{ {present}}} None => {{ {absent}}} }}\n"
-        ))
-    }
-
-    /// The checks on a value that isn't null, `value` a `&` of `ty`'s base.
-    fn present(&self, at: &mut At, value: &str, ty: &Ty) -> Result<String, Error> {
-        if let Base::Union(u) = &ty.base {
-            return unions::union(self, at, value, ty, u);
-        }
-        // A structured value's branches each walk it, so they check apart from its own checks.
-        if ty.base.is_structured() && ty.checks.iter().any(Check::is_branch) {
-            let (branches, own): (Vec<Check>, Vec<Check>) =
-                ty.checks.iter().cloned().partition(Check::is_branch);
-            let own = Ty {
-                checks: own,
-                ..ty.clone()
-            };
-            let own = self.present(at, value, &own)?;
-            return Ok(own + &branches::structured(self, at, value, &branches)?);
-        }
-        let choice = ty.checks.iter().any(|c| matches!(c, Check::OneOf(_)));
-        match &ty.base {
-            // A map has no reader, so a choice of one holds only null.
-            Base::Map(_) if choice => Ok(at.fail("Range")),
-            Base::Model(_) | Base::List(_) | Base::Tuple { .. } if choice => {
-                choices::structured(self, at, value, ty)
-            }
-            Base::Any => boolean::value(self, at, ty),
-            // Checked above, before its branches.
-            Base::Union(_) => Err(Error::unsupported("a union beside branches")),
-            Base::Model(m) => models::model(self, at, value, *m, &ty.checks),
-            Base::Map(_) => models::map(self, at, value, ty),
-            Base::List(item) => lists::list(self, at, value, ty, item),
-            Base::Tuple { prefix, rest } => {
-                tuples::tuple(self, at, value, ty, prefix, rest.as_deref())
-            }
-            Base::Text => text::text(self, at, value, ty),
-            // Held in the embedder's own type, which no check reads.
-            Base::Timestamp | Base::Duration | Base::Bytes => {
-                let conds = self.conds(&ty.base, &ty.checks, value)?;
-                Ok(guard(at, &conds))
-            }
-            // Null's only value is null, which `null` checks.
-            Base::Null => Ok(null(at, ty)),
-            Base::Bool | Base::Int(_) | Base::Float(_) => {
-                let view = at.local("n");
-                let bind = scalars::view(&ty.base, value, &view);
-                let conds = self.conds(&ty.base, &ty.checks, &view)?;
-                if conds.is_empty() {
-                    return Ok(String::new());
-                }
-                Ok(format!("{{ {bind}\n{}}}\n", guard(at, &conds)))
-            }
-        }
-    }
-
-    /// The checks of branch `ty` on `value`, a `&` of a present value of its base: as
-    /// [`Emitter::present`], but a model checks only the fields the branch names.
-    fn branch(&self, at: &mut At, value: &str, ty: &Ty) -> Result<String, Error> {
-        match ty.base {
-            Base::Model(m) => models::view(self, at, value, m, ty),
-            _ => self.present(at, value, ty),
-        }
-    }
-
-    /// Branch `ty` on `value`, a `&` of the value's Rust: an `Option` where `option` says. Null
-    /// holds where the branch admits it.
-    fn branch_value(
-        &self,
-        at: &mut At,
-        value: &str,
-        ty: &Ty,
-        option: bool,
-    ) -> Result<String, Error> {
-        if !option {
-            return self.branch(at, value, ty);
-        }
-        let inner = at.local("y");
-        let present = self.branch(at, &inner, ty)?;
-        let absent = guard(at, &admits(admits_null(ty)));
-        Ok(format!(
-            "match {value} {{ Some({inner}) => {{ {present}}} None => {{ {absent}}} }}\n"
-        ))
+        self.function(name, &m.name, &root)
     }
 
     /// Every condition a value with view `view` must meet: its width's, then each check's.
@@ -245,11 +156,6 @@ fn readable(at: &At, read: &str, bind: &str, body: &str) -> String {
         "match {read} {{ Ok({bind}) => {{ {body}}} Err(_) => {{ {} }} }}\n",
         at.fail("Cast")
     )
-}
-
-/// The checks on null, judged as the code is written: only choices and branches judge it.
-fn null(at: &At, ty: &Ty) -> String {
-    guard(at, &admits(holds_of_null(&ty.checks)))
 }
 
 /// Whether null meets each of `checks`. A choice holds where its literals include null, and a

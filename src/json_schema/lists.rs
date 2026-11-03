@@ -47,32 +47,12 @@ fn contains(k: &mut Key) -> Done {
         Ok(sub) => sub,
         Err(e) => return Some(Err(e)),
     };
-    if nullable || sub.nullable {
-        return Some(Err(Error::unsupported("`contains` of a nullable item")));
+    if let Err(e) = check_contains(&sub, nullable, &item) {
+        return Some(Err(e));
     }
-    if sub.base.is_structured() {
-        return Some(Err(Error::unsupported(
-            "`contains` of an object, a list, or a map",
-        )));
-    }
-    if !same_kind(&sub.base, &item) {
-        return Some(Err(Error::unsupported(
-            "`contains` of another type than `items`",
-        )));
-    }
-    let min = match k.siblings.get("minContains") {
-        None => 1,
-        Some(v) => match count(v) {
-            Some(n) => n,
-            None => return Some(Err(Error::invalid(format!("`minContains` of {v}")))),
-        },
-    };
-    let max = match k.siblings.get("maxContains") {
-        None => None,
-        Some(v) => match count(v) {
-            Some(n) => Some(n),
-            None => return Some(Err(Error::invalid(format!("`maxContains` of {v}")))),
-        },
+    let (min, max) = match contains_bounds(k.siblings) {
+        Ok(bounds) => bounds,
+        Err(e) => return Some(Err(e)),
     };
     if min == 0 && max.is_none() {
         return Some(Ok(()));
@@ -83,6 +63,36 @@ fn contains(k: &mut Key) -> Done {
         max,
     });
     Some(Ok(()))
+}
+
+/// Refuses a `contains` subschema `sub` that isn't a plain scalar of the items' kind: `nullable`
+/// says whether the items are nullable, `item` is their base.
+fn check_contains(sub: &Ty, nullable: bool, item: &Base) -> Result<(), Error> {
+    if nullable || sub.nullable {
+        return Err(Error::unsupported("`contains` of a nullable item"));
+    }
+    if sub.base.is_structured() {
+        return Err(Error::unsupported(
+            "`contains` of an object, a list, or a map",
+        ));
+    }
+    if !same_kind(&sub.base, item) {
+        return Err(Error::unsupported(
+            "`contains` of another type than `items`",
+        ));
+    }
+    Ok(())
+}
+
+/// `minContains` (default 1) and `maxContains` of the list's siblings.
+fn contains_bounds(siblings: &Map<String, Value>) -> Result<(u64, Option<u64>), Error> {
+    let bound = |key: &str| {
+        siblings
+            .get(key)
+            .map(|v| count(v).ok_or_else(|| Error::invalid(format!("`{key}` of {v}"))))
+            .transpose()
+    };
+    Ok((bound("minContains")?.unwrap_or(1), bound("maxContains")?))
 }
 
 /// The subschema of `contains`, lowered. A subschema with no `type` applies to items of the

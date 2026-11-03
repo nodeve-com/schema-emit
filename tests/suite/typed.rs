@@ -78,6 +78,31 @@ fn object(mut s: Map<String, Value>, o: &Map<String, Value>) -> Result<(Value, V
         Some(Value::Object(p)) => p.clone(),
         _ => Map::new(),
     };
+    let (mut kept, loose) = split_keys(&mut props, &sub_names, o)?;
+    let shut = shut_of(&s, &subs);
+    kept.extend(keys::fit(&mut s, &props, &loose, shut)?);
+    // A field the instance lacks checks nothing: any kind will do.
+    for (k, p) in props.iter_mut() {
+        if !o.contains_key(k) {
+            untyped(p);
+        }
+    }
+    if !props.is_empty() {
+        s.insert("properties".into(), Value::Object(props));
+    }
+    Ok((Value::Object(s), Value::Object(kept)))
+}
+
+/// The keys an object keeps, and the loose ones.
+type Split = (Map<String, Value>, Map<String, Value>);
+
+/// The keys of `o` the object keeps, each property fitted to its schema, and the loose ones no
+/// property or `allOf` subschema names.
+fn split_keys(
+    props: &mut Map<String, Value>,
+    sub_names: &[&String],
+    o: &Map<String, Value>,
+) -> Result<Split, String> {
     let (mut kept, mut loose) = (Map::new(), Map::new());
     for (k, v) in o {
         match props.get(k) {
@@ -94,25 +119,22 @@ fn object(mut s: Map<String, Value>, o: &Map<String, Value>) -> Result<(Value, V
             }
         }
     }
-    let strict = s.get("unevaluatedProperties") == Some(&Value::Bool(false))
-        || subs
-            .iter()
-            .any(|m| m.get("unevaluatedProperties") == Some(&Value::Bool(false)));
-    let closed = s.get("additionalProperties") == Some(&Value::Bool(false))
-        || subs
-            .iter()
-            .any(|m| m.get("additionalProperties") == Some(&Value::Bool(false)));
-    kept.extend(keys::fit(&mut s, &props, &loose, closed, strict)?);
-    // A field the instance lacks checks nothing: any kind will do.
-    for (k, p) in props.iter_mut() {
-        if !o.contains_key(k) {
-            untyped(p);
-        }
+    Ok((kept, loose))
+}
+
+/// How shut `s`, or an `allOf` subschema of it, is to keys it never names.
+fn shut_of(s: &Map<String, Value>, subs: &[Map<String, Value>]) -> keys::Shut {
+    let false_in = |key: &str| {
+        s.get(key) == Some(&Value::Bool(false))
+            || subs.iter().any(|m| m.get(key) == Some(&Value::Bool(false)))
+    };
+    if false_in("unevaluatedProperties") {
+        keys::Shut::Strict
+    } else if false_in("additionalProperties") {
+        keys::Shut::Closed
+    } else {
+        keys::Shut::Open
     }
-    if !props.is_empty() {
-        s.insert("properties".into(), Value::Object(props));
-    }
-    Ok((Value::Object(s), Value::Object(kept)))
 }
 
 fn array(mut s: Map<String, Value>, xs: &[Value]) -> Result<(Value, Value), String> {

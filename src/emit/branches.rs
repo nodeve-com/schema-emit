@@ -4,7 +4,7 @@
 //! condition. `anyOf` holds where some branch's condition does, `oneOf` where exactly one does,
 //! and `if`'s where the branch its condition picks does.
 
-use super::{guard, At, Emitter, STD};
+use super::{guard, Emitter, Walk, STD};
 use crate::ir::{Check, Ty};
 use crate::Error;
 
@@ -13,23 +13,29 @@ pub(super) fn cond(e: &Emitter, check: &Check, view: &str) -> Option<Result<Stri
     join(check, holds)
 }
 
-/// Each branch check of `checks` on `value`, a `&` of a present model or list.
-pub(super) fn structured(
-    e: &Emitter,
-    at: &mut At,
-    value: &str,
-    checks: &[Check],
-) -> Result<String, Error> {
-    let mut conds = Vec::new();
-    for check in checks {
-        let mut walk = |ty: &Ty| walks(e, at, value, ty);
-        conds.push(
-            join(check, &mut walk).unwrap_or_else(|| {
+impl Walk<'_, '_> {
+    /// Each branch check of `checks` on `value`, a `&` of a present model or list.
+    pub(super) fn branches(&mut self, value: &str, checks: &[Check]) -> Result<String, Error> {
+        let mut conds = Vec::new();
+        for check in checks {
+            let mut walk = |ty: &Ty| self.walks(value, ty);
+            conds.push(join(check, &mut walk).unwrap_or_else(|| {
                 Err(Error::unsupported(format!("{check:?} on a model or list")))
-            })?,
-        );
+            })?);
+        }
+        Ok(guard(&self.at, &conds))
     }
-    Ok(guard(at, &conds))
+
+    /// A boolean expression, true where branch `ty` holds of `value`: its checks report to a
+    /// `Holds` in place of the value's report.
+    fn walks(&mut self, value: &str, ty: &Ty) -> Result<String, Error> {
+        let q = self.at.local("q");
+        let body = self.branch(value, ty)?;
+        Ok(format!(
+            "{{ let mut {q} = {STD}::Holds::default(); {{ use {STD}::Report as _; let r = &mut {q};\n\
+             {body}}} {q}.held() }}"
+        ))
+    }
 }
 
 /// `check`'s condition, each branch's by `holds`; `None` where it isn't a branch check.
@@ -71,15 +77,4 @@ fn holds(e: &Emitter, ty: &Ty, view: &str) -> Result<String, Error> {
     } else {
         format!("({})", conds.join(" && "))
     })
-}
-
-/// A boolean expression, true where branch `ty` holds of `value`: its checks report to a
-/// `Holds` in place of the value's report.
-fn walks(e: &Emitter, at: &mut At, value: &str, ty: &Ty) -> Result<String, Error> {
-    let q = at.local("q");
-    let body = e.branch(at, value, ty)?;
-    Ok(format!(
-        "{{ let mut {q} = {STD}::Holds::default(); {{ use {STD}::Report as _; let r = &mut {q};\n\
-         {body}}} {q}.held() }}"
-    ))
 }

@@ -17,9 +17,9 @@ use serde_json::{Map, Value};
 use super::notes;
 use super::others::counted;
 use super::Lower;
-use crate::ir::{Base, Field, Model, Ty};
+use crate::ir::{Base, Ty};
 use crate::Error;
-use recursion::{only_notes, recursion};
+use recursion::only_notes;
 
 mod recursion;
 
@@ -142,37 +142,22 @@ pub(super) fn resolve(lower: &Lower, name: &str, target: &Value) -> Result<Targe
     let text = target
         .as_str()
         .ok_or_else(|| Error::invalid(format!("{name}: `$ref` {target}")))?;
-    let outside = || Error::unsupported(format!("{name}: `$ref` {target}"));
     let full = join(&lower.base, text).map_err(|e| e.at(name))?;
     let (doc, raw) = full.split_once('#').unwrap_or((&full, ""));
     let frag = percent_decode_str(raw)
         .decode_utf8()
         .map_err(|_| Error::invalid(format!("{name}: `$ref` {target}")))?;
-    let key = format!("{doc}#{raw}");
-    let found = if frag.is_empty() || frag.starts_with('/') {
-        lower
-            .index
-            .get(doc)
-            .and_then(|(schema, outer)| pointer(schema, outer, doc, &frag))
-    } else {
-        lower.index.get(&format!("{doc}#{frag}")).cloned()
-    };
-    // A definition shared beside the document.
-    let shared = || {
-        let def = frag.strip_prefix("/$defs/")?;
-        Some((lower.defs.get(def)?.clone(), lower.base.clone()))
-    };
-    let (schema, base) =
-        found
-            .or_else(shared)
-            .ok_or_else(|| match lower.index.contains_key(doc) {
-                true => Error::invalid(format!("{name}: no schema at `{text}`")),
-                false => outside(),
-            })?;
+    let (schema, base) = locate(lower, doc, &frag).ok_or_else(|| {
+        if lower.index.contains_key(doc) {
+            Error::invalid(format!("{name}: no schema at `{text}`"))
+        } else {
+            Error::unsupported(format!("{name}: `$ref` {target}"))
+        }
+    })?;
     let last = frag.rsplit('/').next().unwrap_or_default();
     let def = frag.strip_prefix("/$defs/").filter(|d| !d.contains('/'));
     Ok(Target {
-        key,
+        key: format!("{doc}#{raw}"),
         name: if last.is_empty() {
             "ref".into()
         } else {
@@ -181,6 +166,23 @@ pub(super) fn resolve(lower: &Lower, name: &str, target: &Value) -> Result<Targe
         def: def.map(|d| d.replace("~1", "/").replace("~0", "~")),
         schema,
         base,
+    })
+}
+
+/// The schema at fragment `frag` of document `doc`, with the base URI around it: a pointer into
+/// the document, an anchor, or a definition shared beside it.
+fn locate(lower: &Lower, doc: &str, frag: &str) -> Option<(Value, String)> {
+    let found = if frag.is_empty() || frag.starts_with('/') {
+        lower
+            .index
+            .get(doc)
+            .and_then(|(schema, outer)| pointer(schema, outer, doc, frag))
+    } else {
+        lower.index.get(&format!("{doc}#{frag}")).cloned()
+    };
+    found.or_else(|| {
+        let def = frag.strip_prefix("/$defs/")?;
+        Some((lower.defs.get(def)?.clone(), lower.base.clone()))
     })
 }
 
@@ -208,30 +210,17 @@ fn counts_fields(def: &Value) -> bool {
     }
 }
 
-/// `s`, holding `$ref` `target`: the schema it names, then `s`'s other keywords on it.
-pub(super) fn reference(
-    lower: &mut Lower,
-    name: &str,
-    target: &Value,
-    s: &Map<String, Value>,
-) -> Result<Ty, Error> {
-    if let Some(any) = notes::metaschema_ref(name, target, s) {
-        return any;
-    }
-    let t = resolve(lower, name, target)?;
-    if lower.following.contains(&t.key) {
-        return recursion(lower, name, &t, s);
-    }
-    if let Some(k) = [
+/// Refuses a keyword beside a `$ref` that the definition's type owns, and a count of properties
+/// on an open object.
+fn refuse_beside(name: &str, s: &Map<String, Value>, t: &Target) -> Result<(), Error> {
+    let owned = [
         "type",
         "properties",
         "required",
         "items",
         "dependentRequired",
-    ]
-    .iter()
-    .find(|k| s.contains_key(**k))
-    {
+    ];
+    if let Some(k) = owned.iter().find(|k| s.contains_key(**k)) {
         return Err(Error::unsupported(format!("{name}: `{k}` beside `$ref`")));
     }
     if counted(s) && !counts_fields(&t.schema) {
@@ -240,37 +229,47 @@ pub(super) fn reference(
             t.name
         )));
     }
-    let plain = only_notes(name, s).is_ok();
-    if let Some(ty) = lower.lowered.get(&t.key).filter(|_| plain) {
-        return Ok(ty.clone());
-    }
-    let ty = lower.follow(&t, |l| l.ty(&t.name, &t.schema));
-    let wrapper = lower.recursions.remove(&t.key);
-    let mut ty = ty?;
-    // A union a definition declares takes the definition's name, unless one it refers to named it.
-    if let (Base::Union(u), Some(def)) = (&mut ty.base, &t.def) {
-        u.name.get_or_insert_with(|| def.clone());
-    }
-    let Some(model) = wrapper else {
-        let ty = lower.keywords(name, s, ty)?;
-        if plain {
-            lower.lowered.insert(t.key, ty.clone());
+    Ok(())
+}
+
+impl Lower {
+    /// `s`, holding `$ref` `target`: the schema it names, then `s`'s other keywords on it.
+    pub(super) fn reference(
+        &mut self,
+        name: &str,
+        target: &Value,
+        s: &Map<String, Value>,
+    ) -> Result<Ty, Error> {
+        if let Some(any) = notes::metaschema_ref(name, target, s) {
+            return any;
         }
-        return Ok(ty);
-    };
-    only_notes(name, s)?;
-    let field = Field {
-        name: String::new(),
-        ty,
-        required: true,
-    };
-    let wrapped = Model {
-        name: name.into(),
-        fields: vec![field],
-        ..Model::default()
-    };
-    lower.fill(model, wrapped);
-    let ty = Ty::of(Base::Model(model));
-    lower.lowered.insert(t.key, ty.clone());
-    Ok(ty)
+        let t = resolve(self, name, target)?;
+        if self.following.contains(&t.key) {
+            return self.recursion(name, &t, s);
+        }
+        refuse_beside(name, s, &t)?;
+        let plain = only_notes(name, s).is_ok();
+        if let Some(ty) = self.lowered.get(&t.key).filter(|_| plain) {
+            return Ok(ty.clone());
+        }
+        let ty = self.follow(&t, |l| l.ty(&t.name, &t.schema));
+        let wrapper = self.recursions.remove(&t.key);
+        let mut ty = ty?;
+        // A union a definition declares takes the definition's name, unless one it refers to
+        // named it.
+        if let (Base::Union(u), Some(def)) = (&mut ty.base, &t.def) {
+            u.name.get_or_insert_with(|| def.clone());
+        }
+        let ty = match wrapper {
+            Some(model) => {
+                only_notes(name, s)?;
+                self.wrap(name, ty, model)
+            }
+            None => self.keywords(name, s, ty)?,
+        };
+        if plain || wrapper.is_some() {
+            self.lowered.insert(t.key, ty.clone());
+        }
+        Ok(ty)
+    }
 }

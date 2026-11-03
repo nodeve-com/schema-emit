@@ -6,3 +6,8 @@ allow-indexing-slicing-in-tests = true
 disallowed-methods = [
   { path = "humantime::parse_duration", reason = "call schema_emit_runtime's decode, which holds the one parse" },
 ]
+# Function shape. Clippy counts `self` as a parameter, and the fn body, an impl, a braced match
+# arm, and a closure each count as a nesting level.
+too-many-arguments-threshold = 4
+too-many-lines-threshold = 35
+excessive-nesting-threshold = 4

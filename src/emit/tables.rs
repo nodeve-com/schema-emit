@@ -4,7 +4,7 @@
 use std::cell::{Cell, RefCell};
 use std::fmt::Write as _;
 
-use super::{unions, Access, At, Emitter, STD};
+use super::{unions, Access, Emitter, Walk, STD};
 use crate::ir::{Schema, Ty, Union};
 use crate::Error;
 
@@ -52,15 +52,10 @@ impl<'a> Emitter<'a> {
         self.checked(name, || unions::function(self, union, name))
     }
 
-    /// `pub fn <name>`, checking a `&` of `rust`, a value of `ty`, its failures' paths from `path`.
-    pub(super) fn function(
-        &self,
-        name: &str,
-        rust: &str,
-        path: &str,
-        ty: &Ty,
-    ) -> Result<String, Error> {
-        let body = self.present(&mut At::new(path), "v", ty)?;
+    /// `pub fn <name>`, checking a `&` of a value of `ty`, its failures' paths from `path`.
+    pub(super) fn function(&self, name: &str, path: &str, ty: &Ty) -> Result<String, Error> {
+        let rust = self.access.rust(self.schema, &Ty::of(ty.base.clone()))?;
+        let body = Walk::new(self, path).present("v", ty)?;
         Ok(format!(
             "#[allow(unused_variables, unused_mut, unused_parens, unreachable_patterns, clippy::all)]\n\
              pub fn {name}<R: {STD}::Report>(v: &{rust}, r: &mut R) {{\n{body}}}\n"

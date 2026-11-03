@@ -2,64 +2,63 @@
 //! floats narrow to the narrower width), the checks of both apply, nullable only where both are,
 //! and notes must agree.
 
-use super::super::Lower;
-use crate::ir::{Base, Check, Field, Float, Int, Ty};
+use super::Meet;
+use crate::ir::{Base, Check, Field, Float, Int, Model, Ty};
+use crate::json_schema::Lower;
 use crate::Error;
 
-/// Meets `st`, a subschema's type, into `ty`. Two objects merge their fields, by `closed`.
-pub(super) fn into(
-    lower: &mut Lower,
-    name: &str,
-    ty: &mut Ty,
-    st: Ty,
-    closed: bool,
-    sub_closed: bool,
-) -> Result<(), Error> {
-    let objects = match (&ty.base, &st.base) {
-        (Base::Model(i), Base::Model(j)) => Some((*i, *j)),
-        _ => None,
-    };
-    match objects {
-        Some((i, j)) => {
-            merge_fields(lower, name, i, j, closed, sub_closed)?;
-            absorb(name, ty, st)
+impl Lower {
+    /// Meets `st`, a subschema's type, into `meet`. Two objects merge their fields, by `closed`.
+    pub(super) fn into(&mut self, meet: &mut Meet, st: Ty, sub_closed: bool) -> Result<(), Error> {
+        let objects = match (&meet.ty.base, &st.base) {
+            (Base::Model(_), Base::Model(j)) => Some(*j),
+            _ => None,
+        };
+        match objects {
+            Some(j) => {
+                self.merge_fields(meet, j, sub_closed)?;
+                absorb(meet.name, meet.ty, st)
+            }
+            None => ty_meet(meet.name, meet.ty, st),
         }
-        None => ty_meet(name, ty, st),
+    }
+
+    /// Merges model `j`'s fields into the parent's model.
+    fn merge_fields(&mut self, meet: &Meet, j: usize, sub_closed: bool) -> Result<(), Error> {
+        let name = meet.name;
+        let Base::Model(i) = meet.ty.base else {
+            return Err(Error::invalid(format!("{name}: no parent model")));
+        };
+        let Some(theirs) = self.out.models.get(j).map(|m| m.fields.clone()) else {
+            return Err(Error::invalid(format!("{name}: no model {j}")));
+        };
+        let Some(model) = self.out.models.get_mut(i) else {
+            return Err(Error::invalid(format!("{name}: no model {i}")));
+        };
+        let has = |fields: &[Field], n: &str| fields.iter().any(|f| f.name == n);
+        if meet.closed {
+            if let Some(f) = theirs.iter().find(|f| !has(&model.fields, &f.name)) {
+                return Err(Error::unsupported(format!(
+                    "{name}: `allOf` adds `{}`, which a closed object doesn't name",
+                    f.name
+                )));
+            }
+        }
+        if sub_closed {
+            if let Some(f) = model.fields.iter().find(|f| !has(&theirs, &f.name)) {
+                return Err(Error::unsupported(format!(
+                    "{name}: a closed subschema doesn't name `{}`, which another subschema gives",
+                    f.name
+                )));
+            }
+        }
+        merge_into(name, model, theirs)?;
+        Ok(())
     }
 }
 
-/// Merges model `j`'s fields into model `i`, the parent's.
-fn merge_fields(
-    lower: &mut Lower,
-    name: &str,
-    i: usize,
-    j: usize,
-    closed: bool,
-    sub_closed: bool,
-) -> Result<(), Error> {
-    let Some(theirs) = lower.out.models.get(j).map(|m| m.fields.clone()) else {
-        return Err(Error::invalid(format!("{name}: no model {j}")));
-    };
-    let Some(model) = lower.out.models.get_mut(i) else {
-        return Err(Error::invalid(format!("{name}: no model {i}")));
-    };
-    let has = |fields: &[Field], n: &str| fields.iter().any(|f| f.name == n);
-    if closed {
-        if let Some(f) = theirs.iter().find(|f| !has(&model.fields, &f.name)) {
-            return Err(Error::unsupported(format!(
-                "{name}: `allOf` adds `{}`, which a closed object doesn't name",
-                f.name
-            )));
-        }
-    }
-    if sub_closed {
-        if let Some(f) = model.fields.iter().find(|f| !has(&theirs, &f.name)) {
-            return Err(Error::unsupported(format!(
-                "{name}: a closed subschema doesn't name `{}`, which another subschema gives",
-                f.name
-            )));
-        }
-    }
+/// Adds each of `theirs` to `model`: a field both name meets its type and requirement.
+fn merge_into(name: &str, model: &mut Model, theirs: Vec<Field>) -> Result<(), Error> {
     for f in theirs {
         match model.fields.iter_mut().find(|g| g.name == f.name) {
             Some(g) => {

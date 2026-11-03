@@ -24,7 +24,7 @@ mod tuples;
 mod unevaluated;
 mod unions;
 
-pub use defs::lower_defs;
+pub use defs::{lower_defs, lower_ty, Document};
 pub use others::branch_names;
 
 use std::collections::HashMap;
@@ -105,19 +105,6 @@ fn is_model_check(c: &Check) -> bool {
                 | Check::Unevaluated(_)
                 | Check::OneOf(_)
         )
-}
-
-/// Lowers `schema` of any type, adding its models to `out`; `notes` as in [`lower`].
-pub fn lower_ty(
-    name: &str,
-    schema: &Value,
-    shared: &Map<String, Value>,
-    notes: &[&str],
-    out: Schema,
-) -> Result<(Schema, Ty), Error> {
-    let mut lower = Lower::new(out, schema, shared, notes);
-    let ty = lower.ty(name, schema)?;
-    Ok((lower.out, ty))
 }
 
 /// Lowering in progress: the models so far, and the definitions a `$ref` reads.
@@ -224,7 +211,7 @@ impl Lower {
             _ => return Err(Error::unsupported(format!("{name}: a schema of no object"))),
         };
         if let Some(target) = s.get("$ref") {
-            return references::reference(self, name, target, s);
+            return self.reference(name, target, s);
         }
         let (kind, nullable) = match s.get("type") {
             Some(Value::String(t)) => (t.as_str(), false),

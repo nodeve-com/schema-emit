@@ -28,3 +28,19 @@ pub fn lower_defs(
     }
     Ok((lower.out, out))
 }
+
+/// The document a type lowers from: the schema, the definitions shared beside it, and the
+/// annotation keywords to carry.
+pub struct Document<'a> {
+    pub schema: &'a Value,
+    pub shared: &'a Map<String, Value>,
+    pub notes: &'a [&'a str],
+}
+
+/// Lowers `doc`'s schema of any type as `name`, adding its models to `out`; `shared` and `notes`
+/// as in [`lower`].
+pub fn lower_ty(name: &str, doc: &Document, out: Schema) -> Result<(Schema, Ty), Error> {
+    let mut lower = Lower::new(out, doc.schema, doc.shared, doc.notes);
+    let ty = lower.ty(name, doc.schema)?;
+    Ok((lower.out, ty))
+}

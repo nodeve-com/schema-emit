@@ -3,121 +3,148 @@
 
 use serde_json::{Map, Value};
 
-use super::{onto, parent};
-use crate::ir::{Base, Check, Field, Ty};
-use crate::json_schema::{models, Lower};
+use super::{parent, Lower};
+use crate::ir::{Base, Check, Ty};
+use crate::json_schema::models;
 use crate::Error;
 
-/// A branch over model `m`.
-pub(super) fn branch(
-    lower: &mut Lower,
-    key: &str,
-    m: usize,
-    nullable: bool,
-    s: &Map<String, Value>,
-) -> Result<Ty, Error> {
-    if let Some(k) = [
+/// A key a branch names: where it sits for errors, and what its subschema asks of it.
+struct Want<'a> {
+    place: String,
+    name: &'a str,
+    /// The subschema checking the key's value; none where the branch only requires the key.
+    schema: Option<&'a Value>,
+    required: bool,
+}
+
+impl Lower {
+    /// A branch over `over`, a model: its nullability is the branch's.
+    pub(super) fn branch(
+        &mut self,
+        key: &str,
+        over: &Ty,
+        s: &Map<String, Value>,
+    ) -> Result<Ty, Error> {
+        let Base::Model(m) = over.base else {
+            return Err(Error::invalid(format!("`{key}` branches a non-model")));
+        };
+        refuse_counts(key, s)?;
+        let checks = self.member_checks(key, m, s)?;
+        let names_others = checks.iter().any(|c| matches!(c, Check::Entry { .. }));
+        if names_others && s.contains_key("unevaluatedProperties") {
+            return Err(Error::unsupported(format!(
+                "`unevaluatedProperties` in a `{key}` naming keys no field names"
+            )));
+        }
+        let mut rest = s.clone();
+        for k in ["type", "properties", "required"] {
+            rest.remove(k);
+        }
+        let ty = Ty {
+            nullable: over.nullable,
+            checks,
+            ..Ty::of(Base::Model(m))
+        };
+        self.keywords(key, &rest, ty)
+    }
+
+    /// The check of each key `s` gives a subschema or requires, properties first.
+    fn member_checks(
+        &mut self,
+        key: &str,
+        m: usize,
+        s: &Map<String, Value>,
+    ) -> Result<Vec<Check>, Error> {
+        let (required, props) = models::field_lists(key, s)?;
+        let mut wants: Vec<Want> = props
+            .iter()
+            .map(|(name, p)| Want {
+                place: format!("{key}.{name}"),
+                name,
+                schema: Some(p),
+                required: required.contains(name),
+            })
+            .collect();
+        let only_required = required.iter().filter(|r| !props.contains_key(r.as_str()));
+        wants.extend(only_required.map(|name| Want {
+            place: key.into(),
+            name,
+            schema: None,
+            required: true,
+        }));
+        wants.iter().map(|w| self.member(m, w)).collect()
+    }
+
+    /// The check of key `w` of model `m`: its field's, else its other keys'.
+    fn member(&mut self, m: usize, w: &Want) -> Result<Check, Error> {
+        let model = self
+            .out
+            .models
+            .get(m)
+            .ok_or_else(|| Error::invalid(format!("{}: no model {m}", w.place)))?;
+        let others = model.others.clone();
+        match model.fields.iter().position(|f| f.name == w.name) {
+            Some(index) => {
+                let fty = model.fields.get(index).map(|f| parent(&f.ty));
+                let fty = fty.ok_or_else(|| Error::invalid(format!("{}: no field", w.place)))?;
+                self.field(w, index, &fty)
+            }
+            None => self.entry(w, others.as_ref()),
+        }
+    }
+
+    /// Field `index`, of type `fty`, checked as the subschema of `w`.
+    fn field(&mut self, w: &Want, index: usize, fty: &Ty) -> Result<Check, Error> {
+        let p = w.schema.unwrap_or(&Value::Bool(true));
+        let ty = self.onto(&w.place, fty, p)?;
+        Ok(Check::Field {
+            index,
+            ty: Box::new(ty),
+            required: w.required,
+        })
+    }
+
+    /// The value under key `w`, which no field names, checked as its subschema, if any. The
+    /// model must hold other keys, and a subschema judging their values needs them typed.
+    fn entry(&mut self, w: &Want, others: Option<&Ty>) -> Result<Check, Error> {
+        let others = others.ok_or_else(|| {
+            Error::unsupported(format!(
+                "{}: names `{}`, which the object's fields lack",
+                w.place, w.name
+            ))
+        })?;
+        let base = parent(others);
+        let trivial = match w.schema {
+            None | Some(Value::Bool(true)) => true,
+            Some(Value::Object(o)) => o.is_empty(),
+            _ => false,
+        };
+        let ty = match w.schema {
+            Some(p) if !trivial => self.onto(&w.place, &base, p)?,
+            _ => base,
+        };
+        Ok(Check::Entry {
+            name: w.name.into(),
+            ty: Box::new(ty),
+            required: w.required,
+        })
+    }
+}
+
+/// Refuses the keywords a branch over an object can't judge.
+fn refuse_counts(key: &str, s: &Map<String, Value>) -> Result<(), Error> {
+    let found = [
         "minProperties",
         "maxProperties",
         "dependentRequired",
         "additionalProperties",
     ]
     .into_iter()
-    .find(|k| s.contains_key(*k))
-    {
-        return Err(Error::unsupported(format!(
+    .find(|k| s.contains_key(*k));
+    match found {
+        Some(k) => Err(Error::unsupported(format!(
             "`{k}` in a `{key}` over an object"
-        )));
+        ))),
+        None => Ok(()),
     }
-    let (required, props) = models::field_lists(key, s)?;
-    let (fields, others) = lower
-        .out
-        .models
-        .get(m)
-        .map(|x| (x.fields.clone(), x.others.clone()))
-        .ok_or_else(|| Error::invalid(format!("{key}: no model {m}")))?;
-    let mut checks = Vec::new();
-    for (name, p) in &props {
-        let place = format!("{key}.{name}");
-        let need = required.contains(name);
-        checks.push(match fields.iter().position(|f| f.name == *name) {
-            Some(index) => field(lower, &place, index, &fields, p, need)?,
-            None => entry(lower, &place, name, others.as_ref(), Some(p), need)?,
-        });
-    }
-    for name in required.iter().filter(|r| !props.contains_key(r.as_str())) {
-        checks.push(match fields.iter().position(|f| f.name == *name) {
-            Some(index) => field(lower, key, index, &fields, &Value::Bool(true), true)?,
-            None => entry(lower, key, name, others.as_ref(), None, true)?,
-        });
-    }
-    let names_others = checks.iter().any(|c| matches!(c, Check::Entry { .. }));
-    if names_others && s.contains_key("unevaluatedProperties") {
-        return Err(Error::unsupported(format!(
-            "`unevaluatedProperties` in a `{key}` naming keys no field names"
-        )));
-    }
-    let mut rest = s.clone();
-    for k in ["type", "properties", "required"] {
-        rest.remove(k);
-    }
-    let ty = Ty {
-        nullable,
-        checks,
-        ..Ty::of(Base::Model(m))
-    };
-    lower.keywords(key, &rest, ty)
-}
-
-/// Field `index`, checked as subschema `p`.
-fn field(
-    lower: &mut Lower,
-    place: &str,
-    index: usize,
-    fields: &[Field],
-    p: &Value,
-    required: bool,
-) -> Result<Check, Error> {
-    let fty = fields
-        .get(index)
-        .map(|f| parent(&f.ty))
-        .ok_or_else(|| Error::invalid(format!("{place}: no field {index}")))?;
-    let ty = onto(lower, place, &fty, p)?;
-    Ok(Check::Field {
-        index,
-        ty: Box::new(ty),
-        required,
-    })
-}
-
-/// The value under key `name`, which no field names, checked as subschema `p`, if any. The
-/// model must hold other keys, and a subschema judging their values needs them typed.
-fn entry(
-    lower: &mut Lower,
-    place: &str,
-    name: &str,
-    others: Option<&Ty>,
-    p: Option<&Value>,
-    required: bool,
-) -> Result<Check, Error> {
-    let others = others.ok_or_else(|| {
-        Error::unsupported(format!(
-            "{place}: names `{name}`, which the object's fields lack"
-        ))
-    })?;
-    let base = parent(others);
-    let trivial = match p {
-        None | Some(Value::Bool(true)) => true,
-        Some(Value::Object(o)) => o.is_empty(),
-        _ => false,
-    };
-    let ty = match p {
-        Some(p) if !trivial => onto(lower, place, &base, p)?,
-        _ => base,
-    };
-    Ok(Check::Entry {
-        name: name.into(),
-        ty: Box::new(ty),
-        required,
-    })
 }

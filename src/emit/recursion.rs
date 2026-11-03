@@ -11,8 +11,7 @@
 //! and `at` encodes one level. Its function is `<name>_m<index>` and reports to a `Holds`: a
 //! failure inside is one `range` at the value's own path.
 
-use super::{models, At, Emitter, STD};
-use crate::ir::Model;
+use super::{Emitter, Walk, STD};
 use crate::ir::{Base, Check, Ty};
 use crate::Error;
 
@@ -102,6 +101,17 @@ pub(super) struct Mark {
 }
 
 impl Mark {
+    fn new(id: usize, name: &str, root: usize) -> Mark {
+        Mark {
+            id,
+            name: name.into(),
+            root,
+            steps: Vec::new(),
+            inside: Vec::new(),
+            broken: false,
+        }
+    }
+
     fn tag(&self) -> String {
         format!("\u{a7}{}\u{a7}", self.id)
     }
@@ -127,158 +137,152 @@ impl Mark {
     }
 }
 
-/// A nested value of `model`, `value` a `&` of its Rust, checked by calling its function, then by
-/// `checks`; `None` where `model` inlines: it is no recursion, or it is the function being written.
-pub(super) fn call(
-    e: &Emitter,
-    at: &mut At,
-    value: &str,
-    model: usize,
-    checks: &[Check],
-) -> Option<Result<String, Error>> {
-    let this = e.root.take() == Some(model);
-    let m = e.schema.models.get(model)?;
-    if this || !e.cyclic(model) {
-        return None;
-    }
-    if let Some(mark) = at.mark.as_mut() {
+impl Walk<'_, '_> {
+    /// A nested value of `model`, `value` a `&` of its Rust, checked by calling its function, then
+    /// by `checks`; `None` where `model` inlines: it is no recursion, or it is the function being
+    /// written.
+    pub(super) fn call(
+        &mut self,
+        value: &str,
+        model: usize,
+        checks: &[Check],
+    ) -> Option<Result<String, Error>> {
+        let e = self.e;
+        let this = e.root.take() == Some(model);
+        e.schema.models.get(model)?;
+        if this || !e.cyclic(model) {
+            return None;
+        }
+        let Some(mark) = self.at.mark.as_mut() else {
+            return Some(self.enter(value, model, checks));
+        };
         if mark.root == model {
-            return Some(back(e, at, value, m, model, checks));
+            return Some(self.back(value, model, checks));
         }
-        if e.reach(model).contains(&mark.root) {
-            if mark.inside.contains(&model) {
-                mark.broken = true;
-                return Some(Ok(String::new()));
-            }
-            mark.inside.push(model);
-            let inline = models::inline(e, at, value, model, checks);
-            if let Some(mark) = at.mark.as_mut() {
-                mark.inside.pop();
-            }
-            return Some(inline);
+        if !e.reach(model).contains(&mark.root) {
+            return Some(self.enter(value, model, checks));
         }
+        if mark.inside.contains(&model) {
+            mark.broken = true;
+            return Some(Ok(String::new()));
+        }
+        mark.inside.push(model);
+        let inline = self.inline(value, model, checks);
+        if let Some(mark) = self.at.mark.as_mut() {
+            mark.inside.pop();
+        }
+        Some(inline)
     }
-    Some(enter(e, at, value, m, model, checks))
+
+    /// The call of a recursive model's function from a value of `model` in another place.
+    fn enter(&mut self, value: &str, model: usize, checks: &[Check]) -> Result<String, Error> {
+        let e = self.e;
+        let whole = self.whole(value, model, checks)?;
+        let kept = e.extra.borrow().len();
+        if let Some(call) = self.marked(value, model)? {
+            return Ok(call + &whole);
+        }
+        e.extra.borrow_mut().truncate(kept);
+        let name = e.helper(model);
+        e.write_helper(model, &name)?;
+        let call = format!(
+            "{{ let mut q = {STD}::Holds::default(); {name}({value}, &mut q); if !q.held() {{ {} }} }}\n",
+            self.at.fail("Range")
+        );
+        Ok(call + &whole)
+    }
+
+    /// The call back to the function being written from a nested value of its model.
+    fn back(&mut self, value: &str, model: usize, checks: &[Check]) -> Result<String, Error> {
+        let indices: String = self
+            .at
+            .indices
+            .iter()
+            .map(|i| format!(".push({i} as u32)"))
+            .collect();
+        let path = self.at.path.clone();
+        let Some(mark) = self.at.mark.as_mut() else {
+            return Err(Error::invalid("a call back outside a recursive function"));
+        };
+        let step = path
+            .split_once(&mark.tag())
+            .map(|(_, step)| step.to_string())
+            .unwrap_or_default();
+        if step.contains(['|', '(', ')']) {
+            mark.broken = true;
+        }
+        let k = match mark.steps.iter().position(|s| *s == step) {
+            Some(k) => k,
+            None => {
+                mark.steps.push(step);
+                mark.steps.len().saturating_sub(1)
+            }
+        };
+        let (slot, name) = (mark.slot(k), mark.name.clone());
+        let whole = self.whole(value, model, checks)?;
+        Ok(format!(
+            "{name}({value}, r, pre, &reps.join(&{STD}::Trail::new(){slot}{indices}), n.saturating_add(1));\n{whole}"
+        ))
+    }
+
+    /// The call of a new function checking `value`, a `&` of recursive model `model`, in place
+    /// here; `None` where the model has no one step to mark.
+    pub(super) fn marked(&self, value: &str, model: usize) -> Result<Option<String>, Error> {
+        let e = self.e;
+        let id = e.ids.get();
+        e.ids.set(id.saturating_add(1));
+        let name = format!("{}_m{model}_{id}", e.tables.borrow().0);
+        let mark = Mark::new(id, &name, model);
+        let mut sub = Walk::new(e, &format!("{}{}", self.at.path, mark.tag()));
+        sub.at.mark = Some(mark);
+        let (m, rust) = e.parts(model)?;
+        let root = Ty {
+            checks: m.checks.clone(),
+            ..Ty::of(Base::Model(model))
+        };
+        let kept = e.extra.borrow().len();
+        let saved = e.root.replace(Some(model));
+        let body = sub.present("v", &root);
+        e.root.set(saved);
+        let body = body?;
+        let Some(mark) = sub.at.mark.filter(|m| !m.broken) else {
+            return Ok(None);
+        };
+        let function = format!(
+            "#[allow(unused_variables, unused_mut, unused_parens, clippy::all)]\n\
+             pub fn {name}<R: {STD}::Report>(v: &{rust}, r: &mut R, pre: &{STD}::Trail, \
+             reps: &{STD}::Trail, n: u32) {{\n{body}}}\n"
+        );
+        e.register(&mark, kept, &function);
+        Ok(Some(format!(
+            "{name}({value}, r, &{}, &{STD}::Trail::new(), 0);\n",
+            self.at.trail()
+        )))
+    }
 }
 
-/// The call of a recursive model's function from a value of `model` in another place.
-fn enter(
-    e: &Emitter,
-    at: &mut At,
-    value: &str,
-    m: &Model,
-    model: usize,
-    checks: &[Check],
-) -> Result<String, Error> {
-    let whole = models::whole(e, at, value, m, model, checks)?;
-    let kept = e.extra.borrow().len();
-    if let Some(call) = marked(e, at, value, model)? {
-        return Ok(call + &whole);
+impl Emitter<'_> {
+    /// Adds `function` to the extra functions, finishing it and each added since `kept` with
+    /// `mark`.
+    fn register(&self, mark: &Mark, kept: usize, function: &str) {
+        let mut extra = self.extra.borrow_mut();
+        for (_, text) in extra.iter_mut().skip(kept) {
+            *text = mark.finish(text);
+        }
+        extra.push((mark.name.clone(), mark.finish(function)));
     }
-    e.extra.borrow_mut().truncate(kept);
-    let name = e.helper(model);
-    if !e.extra.borrow().iter().any(|(n, _)| *n == name) {
-        let slot = e.extra.borrow().len();
-        e.extra.borrow_mut().push((name.clone(), String::new()));
-        let function = e.plain_check(model, &name)?;
-        if let Some(entry) = e.extra.borrow_mut().get_mut(slot) {
+
+    /// Writes the plain function `name` checking model `model` into the extra functions, once.
+    fn write_helper(&self, model: usize, name: &str) -> Result<(), Error> {
+        if self.extra.borrow().iter().any(|(n, _)| n == name) {
+            return Ok(());
+        }
+        let slot = self.extra.borrow().len();
+        self.extra.borrow_mut().push((name.into(), String::new()));
+        let function = self.plain_check(model, name)?;
+        if let Some(entry) = self.extra.borrow_mut().get_mut(slot) {
             entry.1 = function;
         }
+        Ok(())
     }
-    let call = format!(
-        "{{ let mut q = {STD}::Holds::default(); {name}({value}, &mut q); if !q.held() {{ {} }} }}\n",
-        at.fail("Range")
-    );
-    Ok(call + &whole)
-}
-
-/// The call back to the function being written from a nested value of its model.
-fn back(
-    e: &Emitter,
-    at: &mut At,
-    value: &str,
-    m: &Model,
-    model: usize,
-    checks: &[Check],
-) -> Result<String, Error> {
-    let indices: String = at
-        .indices
-        .iter()
-        .map(|i| format!(".push({i} as u32)"))
-        .collect();
-    let Some(mark) = at.mark.as_mut() else {
-        return Err(Error::invalid("a call back outside a recursive function"));
-    };
-    let step = at
-        .path
-        .split_once(&mark.tag())
-        .map(|(_, step)| step.to_string())
-        .unwrap_or_default();
-    if step.contains(['|', '(', ')']) {
-        mark.broken = true;
-    }
-    let k = match mark.steps.iter().position(|s| *s == step) {
-        Some(k) => k,
-        None => {
-            mark.steps.push(step);
-            mark.steps.len().saturating_sub(1)
-        }
-    };
-    let slot = mark.slot(k);
-    let name = mark.name.clone();
-    let whole = models::whole(e, at, value, m, model, checks)?;
-    Ok(format!(
-        "{name}({value}, r, pre, &reps.join(&{STD}::Trail::new(){slot}{indices}), n.saturating_add(1));\n{whole}"
-    ))
-}
-
-/// The call of a new function checking `value`, a `&` of recursive model `model`, in place at
-/// `at`; `None` where the model has no one step to mark.
-pub(super) fn marked(
-    e: &Emitter,
-    at: &At,
-    value: &str,
-    model: usize,
-) -> Result<Option<String>, Error> {
-    let id = e.ids.get();
-    e.ids.set(id.saturating_add(1));
-    let name = format!("{}_m{model}_{id}", e.tables.borrow().0);
-    let mark = Mark {
-        id,
-        name: name.clone(),
-        root: model,
-        steps: Vec::new(),
-        inside: Vec::new(),
-        broken: false,
-    };
-    let tag = mark.tag();
-    let mut sub = At::new(&format!("{}{tag}", at.path));
-    sub.mark = Some(mark);
-    let (m, rust) = e.parts(model)?;
-    let root = Ty {
-        checks: m.checks.clone(),
-        ..Ty::of(Base::Model(model))
-    };
-    let kept = e.extra.borrow().len();
-    let saved = e.root.replace(Some(model));
-    let body = e.present(&mut sub, "v", &root);
-    e.root.set(saved);
-    let body = body?;
-    let Some(mark) = sub.mark.filter(|m| !m.broken) else {
-        return Ok(None);
-    };
-    let function = format!(
-        "#[allow(unused_variables, unused_mut, unused_parens, clippy::all)]\n\
-         pub fn {name}<R: {STD}::Report>(v: &{rust}, r: &mut R, pre: &{STD}::Trail, \
-         reps: &{STD}::Trail, n: u32) {{\n{body}}}\n"
-    );
-    let mut extra = e.extra.borrow_mut();
-    for (_, text) in extra.iter_mut().skip(kept) {
-        *text = mark.finish(text);
-    }
-    extra.push((name.clone(), mark.finish(&function)));
-    Ok(Some(format!(
-        "{name}({value}, r, &{}, &{STD}::Trail::new(), 0);\n",
-        at.trail()
-    )))
 }

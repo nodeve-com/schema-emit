@@ -75,16 +75,23 @@ fn expand(path: &str, at: &[u32], w: &mut impl Sink) -> Result<(), ()> {
             };
         holes(head, &mut next, w)?;
         if let Some(steps) = mark {
-            let several = cut(steps, "|").is_some();
-            for _ in 0..next.next().unwrap_or(0) {
-                let pick = if several { next.next().unwrap_or(0) } else { 0 };
-                let step = Split::new(steps, "|")
-                    .nth(pick as usize)
-                    .unwrap_or_default();
-                holes(step, &mut next, w)?;
-            }
+            repeat(steps, &mut next, w)?;
         }
         rest = tail;
+    }
+    Ok(())
+}
+
+/// Writes a mark's steps, once per repeat the next entry counts, each repeat's step picked by the
+/// entry after it where there are several.
+fn repeat(steps: &str, next: &mut impl Iterator<Item = u32>, w: &mut impl Sink) -> Result<(), ()> {
+    let several = cut(steps, "|").is_some();
+    for _ in 0..next.next().unwrap_or(0) {
+        let pick = if several { next.next().unwrap_or(0) } else { 0 };
+        let step = Split::new(steps, "|")
+            .nth(pick as usize)
+            .unwrap_or_default();
+        holes(step, next, w)?;
     }
     Ok(())
 }

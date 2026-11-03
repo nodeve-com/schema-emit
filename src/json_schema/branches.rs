@@ -49,7 +49,7 @@ fn choose(k: &mut Key, check: fn(Vec<Ty>) -> Check) -> Result<(), Error> {
     let parent = parent(k.ty);
     let subs = xs
         .iter()
-        .map(|x| onto(&mut *k.lower, key, &parent, x))
+        .map(|x| k.lower.onto(key, &parent, x))
         .collect::<Result<Vec<_>, _>>()?;
     k.ty.checks.push(check(subs));
     Ok(())
@@ -61,9 +61,9 @@ fn if_then_else(k: &mut Key) -> Result<(), Error> {
         return Ok(());
     }
     let parent = parent(k.ty);
-    let when = onto(&mut *k.lower, "if", &parent, value)?;
-    let then = arm(&mut *k.lower, "then", &parent, siblings.get("then"))?;
-    let otherwise = arm(&mut *k.lower, "else", &parent, siblings.get("else"))?;
+    let when = k.lower.onto("if", &parent, value)?;
+    let then = k.lower.arm("then", &parent, siblings.get("then"))?;
+    let otherwise = k.lower.arm("else", &parent, siblings.get("else"))?;
     k.ty.checks.push(Check::Conditional {
         when: Box::new(when),
         then,
@@ -80,105 +80,123 @@ pub(super) fn parent(ty: &Ty) -> Ty {
     }
 }
 
-/// An optional branch, lowered if present.
-fn arm(
-    lower: &mut Lower,
-    key: &str,
-    parent: &Ty,
-    sub: Option<&Value>,
-) -> Result<Option<Box<Ty>>, Error> {
-    sub.map(|s| onto(lower, key, parent, s).map(Box::new))
-        .transpose()
-}
+impl Lower {
+    /// An optional branch, lowered if present.
+    fn arm(
+        &mut self,
+        key: &str,
+        parent: &Ty,
+        sub: Option<&Value>,
+    ) -> Result<Option<Box<Ty>>, Error> {
+        sub.map(|s| self.onto(key, parent, s).map(Box::new))
+            .transpose()
+    }
 
-/// `sub`, a subschema of a value of `parent`'s type, as a branch: `parent`'s base with `sub`'s
-/// checks, nullable where both admit null.
-pub(super) fn onto(lower: &mut Lower, key: &str, parent: &Ty, sub: &Value) -> Result<Ty, Error> {
-    let base = &parent.base;
-    if *base == Base::Any {
-        return Err(Error::unsupported(format!(
-            "`{key}` over a value of any kind"
-        )));
-    }
-    let s = match sub {
-        Value::Bool(true) => return Ok(parent.clone()),
-        Value::Bool(false) => return Ok(none(base, false)),
-        Value::Object(s) => s,
-        other => return Err(Error::invalid(format!("`{key}` holds {other}"))),
-    };
-    if let Base::Model(m) = base {
-        if let Some(nullable) = object(key, s)? {
-            let nullable = parent.nullable && nullable;
-            if let Some(target) = s.get("$ref") {
-                return via_ref(lower, key, parent, target, s);
-            }
-            if let Some(all) = s.get("allOf") {
-                return all_of(lower, key, parent, s, all);
-            }
-            return model::branch(lower, key, *m, nullable, s);
-        }
-    }
-    if !(s.contains_key("type") || s.contains_key("$ref")) {
-        if let Some(k) = ["items", "prefixItems", "additionalProperties"]
-            .into_iter()
-            .find(|k| base.is_structured() && s.contains_key(*k))
-        {
+    /// `sub`, a subschema of a value of `parent`'s type, as a branch: `parent`'s base with
+    /// `sub`'s checks, nullable where both admit null.
+    pub(super) fn onto(&mut self, key: &str, parent: &Ty, sub: &Value) -> Result<Ty, Error> {
+        let base = &parent.base;
+        if *base == Base::Any {
             return Err(Error::unsupported(format!(
-                "`{k}` in an untyped `{key}` over a list or map"
+                "`{key}` over a value of any kind"
             )));
         }
-        return lower.keywords(key, s, parent.clone());
+        let s = match sub {
+            Value::Bool(true) => return Ok(parent.clone()),
+            Value::Bool(false) => return Ok(none(base, false)),
+            Value::Object(s) => s,
+            other => return Err(Error::invalid(format!("`{key}` holds {other}"))),
+        };
+        if let Some(ty) = self.onto_object(key, parent, s)? {
+            return Ok(ty);
+        }
+        if !(s.contains_key("type") || s.contains_key("$ref")) {
+            refuse_items(key, base, s)?;
+            return self.keywords(key, s, parent.clone());
+        }
+        let st = self.ty(key, sub)?;
+        if !overlaps(base, &st.base) {
+            return Ok(none(base, st.nullable || st.base == Base::Null));
+        }
+        let mut ty = parent.clone();
+        ty_meet(key, &mut ty, st)?;
+        Ok(ty)
     }
-    let st = lower.ty(key, sub)?;
-    if !overlaps(base, &st.base) {
-        return Ok(none(base, st.nullable || st.base == Base::Null));
-    }
-    let mut ty = parent.clone();
-    ty_meet(key, &mut ty, st)?;
-    Ok(ty)
-}
 
-/// `s`, holding `$ref` `target`, over a model: the definition's branch, then `s`'s other keywords
-/// as a branch of their own, both holding.
-fn via_ref(
-    lower: &mut Lower,
-    key: &str,
-    parent: &Ty,
-    target: &Value,
-    s: &Map<String, Value>,
-) -> Result<Ty, Error> {
-    let t = super::references::definition(lower, key, target)?;
-    let mut ty = lower.follow(&t, |l| onto(l, key, parent, &t.schema))?;
-    let mut rest = s.clone();
-    rest.remove("$ref");
-    let st = onto(lower, key, parent, &Value::Object(rest))?;
-    and(key, &mut ty, st)?;
-    Ok(ty)
-}
-
-/// `s`, holding `allOf` `all`, over a model: its other keywords' branch and each subschema's,
-/// all of which hold.
-fn all_of(
-    lower: &mut Lower,
-    key: &str,
-    parent: &Ty,
-    s: &Map<String, Value>,
-    all: &Value,
-) -> Result<Ty, Error> {
-    let Value::Array(subs) = all else {
-        return Err(Error::invalid(format!("`allOf` of {all}")));
-    };
-    if subs.is_empty() {
-        return Err(Error::invalid("`allOf` of no subschema"));
+    /// `s` as a branch over `parent`, a model, where `s` describes an object; `None` where it
+    /// states another kind, or `parent` is no model.
+    fn onto_object(
+        &mut self,
+        key: &str,
+        parent: &Ty,
+        s: &Map<String, Value>,
+    ) -> Result<Option<Ty>, Error> {
+        if !matches!(parent.base, Base::Model(_)) {
+            return Ok(None);
+        }
+        let Some(nullable) = object(key, s)? else {
+            return Ok(None);
+        };
+        if s.contains_key("$ref") {
+            return self.via_ref(key, parent, s).map(Some);
+        }
+        if s.contains_key("allOf") {
+            return self.all_of(key, parent, s).map(Some);
+        }
+        let over = Ty {
+            nullable: parent.nullable && nullable,
+            ..parent.clone()
+        };
+        self.branch(key, &over, s).map(Some)
     }
-    let mut rest = s.clone();
-    rest.remove("allOf");
-    let mut ty = onto(lower, key, parent, &Value::Object(rest))?;
-    for sub in subs {
-        let st = onto(lower, key, parent, sub)?;
+
+    /// `s`, holding a `$ref`, over a model: the definition's branch, then `s`'s other keywords
+    /// as a branch of their own, both holding.
+    fn via_ref(&mut self, key: &str, parent: &Ty, s: &Map<String, Value>) -> Result<Ty, Error> {
+        let Some(target) = s.get("$ref") else {
+            return Err(Error::invalid(format!("`{key}` holds no `$ref`")));
+        };
+        let t = super::references::definition(self, key, target)?;
+        let mut ty = self.follow(&t, |l| l.onto(key, parent, &t.schema))?;
+        let mut rest = s.clone();
+        rest.remove("$ref");
+        let st = self.onto(key, parent, &Value::Object(rest))?;
         and(key, &mut ty, st)?;
+        Ok(ty)
     }
-    Ok(ty)
+
+    /// `s`, holding `allOf`, over a model: its other keywords' branch and each subschema's, all
+    /// of which hold.
+    fn all_of(&mut self, key: &str, parent: &Ty, s: &Map<String, Value>) -> Result<Ty, Error> {
+        let all = s.get("allOf");
+        let Some(Value::Array(subs)) = all else {
+            return Err(Error::invalid(format!("`allOf` of {all:?}")));
+        };
+        if subs.is_empty() {
+            return Err(Error::invalid("`allOf` of no subschema"));
+        }
+        let mut rest = s.clone();
+        rest.remove("allOf");
+        let mut ty = self.onto(key, parent, &Value::Object(rest))?;
+        for sub in subs {
+            let st = self.onto(key, parent, sub)?;
+            and(key, &mut ty, st)?;
+        }
+        Ok(ty)
+    }
+}
+
+/// Refuses the list and map keywords in an untyped branch over a list or map.
+fn refuse_items(key: &str, base: &Base, s: &Map<String, Value>) -> Result<(), Error> {
+    let found = ["items", "prefixItems", "additionalProperties"]
+        .into_iter()
+        .find(|k| base.is_structured() && s.contains_key(*k));
+    match found {
+        Some(k) => Err(Error::unsupported(format!(
+            "`{k}` in an untyped `{key}` over a list or map"
+        ))),
+        None => Ok(()),
+    }
 }
 
 /// Adds branch `st`'s checks to `ty`, both branches over one model: each holds, so both

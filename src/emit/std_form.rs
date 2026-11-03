@@ -11,7 +11,7 @@
 use std::fmt::Write as _;
 
 use super::Access;
-use crate::ir::{Base, Int, Schema, Ty, Union};
+use crate::ir::{Base, Int, Model, Schema, Ty, Union};
 use crate::Error;
 
 mod decode;
@@ -129,16 +129,7 @@ impl<'a> StdForm<'a> {
             Base::Duration => "::chrono::TimeDelta".into(),
             Base::Bytes => "Vec<u8>".into(),
             Base::List(item) => format!("Vec<{}>", self.ty(item, None)),
-            Base::Tuple { prefix, rest } => {
-                let mut parts: Vec<String> = prefix
-                    .iter()
-                    .map(|p| format!("Option<{}>", self.ty(p, owner)))
-                    .collect();
-                if let Some(r) = rest {
-                    parts.push(format!("Vec<{}>", self.ty(r, None)));
-                }
-                tuple_of(&parts)
-            }
+            Base::Tuple { prefix, rest } => self.tuple_ty(prefix, rest.as_deref(), owner),
             Base::Map(item) => format!(
                 "::std::collections::BTreeMap<String, {}>",
                 self.ty(item, None)
@@ -156,6 +147,18 @@ impl<'a> StdForm<'a> {
         }
     }
 
+    /// The Rust tuple of a tuple type: an `Option` per position, then the list of the rest.
+    fn tuple_ty(&self, prefix: &[Ty], rest: Option<&Ty>, owner: Option<usize>) -> String {
+        let mut parts: Vec<String> = prefix
+            .iter()
+            .map(|p| format!("Option<{}>", self.ty(p, owner)))
+            .collect();
+        if let Some(r) = rest {
+            parts.push(format!("Vec<{}>", self.ty(r, None)));
+        }
+        tuple_of(&parts)
+    }
+
     /// Whether a value of model `from` holds a value of model `to` in its own size: `from` is
     /// `to`, or has a field of a model that does, directly or in a tuple.
     fn holds(&self, from: usize, to: usize) -> bool {
@@ -165,17 +168,27 @@ impl<'a> StdForm<'a> {
             if m == to {
                 return true;
             }
-            let fields = self.schema.models.get(m).map(|m| m.fields.as_slice());
-            for f in fields.unwrap_or_default() {
-                for n in inline(&f.ty) {
-                    if !seen.contains(&n) {
-                        seen.push(n);
-                        todo.push(n);
-                    }
-                }
-            }
+            todo.extend(self.unseen_models(m, &mut seen));
         }
         false
+    }
+
+    /// The models a value of model `m` holds in its own size, through its fields, that `seen`
+    /// lacks; `seen` gains them.
+    fn unseen_models(&self, m: usize, seen: &mut Vec<usize>) -> Vec<usize> {
+        let fields = self.schema.models.get(m).map(|m| m.fields.as_slice());
+        let mut fresh = Vec::new();
+        for n in fields
+            .unwrap_or_default()
+            .iter()
+            .flat_map(|f| inline(&f.ty))
+        {
+            if !seen.contains(&n) {
+                seen.push(n);
+                fresh.push(n);
+            }
+        }
+        fresh
     }
 
     /// The name of model `model`'s field of keys no field names.
@@ -198,32 +211,38 @@ impl<'a> StdForm<'a> {
             if (self.external)(i).is_some() {
                 continue;
             }
-            let names = idents::of(m);
-            let mut fields = String::new();
-            for (f, name) in m.fields.iter().zip(&names.fields) {
-                let ty = self.ty(&f.ty, Some(i));
-                let ty = if f.required {
-                    ty
-                } else {
-                    format!("Option<{ty}>")
-                };
-                let _ = write!(fields, "pub {name}: {ty}, ");
-            }
-            if let Some(held) = &m.others {
-                let held = self.ty(held, None);
-                let _ = write!(
-                    fields,
-                    "pub {}: ::std::collections::BTreeMap<String, {held}>, ",
-                    names.others
-                );
-            }
             let _ = writeln!(
                 out,
-                "#[derive(Debug, Clone, PartialEq)] #[allow(dead_code)] pub struct {} {{ {fields}}}",
-                (self.name)(i)
+                "#[derive(Debug, Clone, PartialEq)] #[allow(dead_code)] pub struct {} {{ {}}}",
+                (self.name)(i),
+                self.struct_fields(i, m)
             );
         }
         out
+    }
+
+    /// Model `i`'s fields, then its field of keys no field names, as the struct declares them.
+    fn struct_fields(&self, i: usize, m: &Model) -> String {
+        let names = idents::of(m);
+        let mut fields = String::new();
+        for (f, name) in m.fields.iter().zip(&names.fields) {
+            let ty = self.ty(&f.ty, Some(i));
+            let ty = if f.required {
+                ty
+            } else {
+                format!("Option<{ty}>")
+            };
+            let _ = write!(fields, "pub {name}: {ty}, ");
+        }
+        if let Some(held) = &m.others {
+            let held = self.ty(held, None);
+            let _ = write!(
+                fields,
+                "pub {}: ::std::collections::BTreeMap<String, {held}>, ",
+                names.others
+            );
+        }
+        fields
     }
 }
 

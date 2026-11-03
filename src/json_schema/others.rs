@@ -202,10 +202,10 @@ fn dependent_schemas(k: &mut Key) -> Result<(), Error> {
     let parent = branches::parent(k.ty);
     for (key, sub) in deps {
         let present = json!({ "required": [key] });
-        let mut when = branches::onto(k.lower, "dependentSchemas", &parent, &present)?;
+        let mut when = k.lower.onto("dependentSchemas", &parent, &present)?;
         // A null has no key to be present.
         when.nullable = false;
-        let then = branches::onto(k.lower, "dependentSchemas", &parent, sub)?;
+        let then = k.lower.onto("dependentSchemas", &parent, sub)?;
         k.ty.checks.push(Check::Conditional {
             when: Box::new(when),
             then: Some(Box::new(then)),

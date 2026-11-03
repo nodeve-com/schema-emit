@@ -3,44 +3,40 @@
 
 use std::fmt::Write as _;
 
-use super::{At, Emitter};
-use crate::ir::Model;
+use super::Walk;
 use crate::Error;
 
-pub(super) fn fields(
-    e: &Emitter,
-    at: &At,
-    value: &str,
-    m: &Model,
-    model: usize,
-    evaluated: &[String],
-) -> Result<String, Error> {
-    let mut out = String::new();
-    for (i, f) in m.fields.iter().enumerate() {
-        if evaluated.contains(&f.name) {
-            continue;
+impl Walk<'_, '_> {
+    /// Each field and other key of model `model`, read from `value`, that `evaluated` omits.
+    pub(super) fn unevaluated(
+        &self,
+        value: &str,
+        model: usize,
+        evaluated: &[String],
+    ) -> Result<String, Error> {
+        let (m, e) = (self.e.model(model)?, self.e);
+        let mut out = String::new();
+        for (i, f) in m.fields.iter().enumerate() {
+            if evaluated.contains(&f.name) {
+                continue;
+            }
+            let _ = writeln!(
+                out,
+                "if ({}).is_some() {{ {} }}",
+                e.access.field(value, model, i),
+                self.at.under(&f.name).fail("Range")
+            );
         }
-        let sub = at.under(&f.name);
-        let _ = writeln!(
-            out,
-            "if ({}).is_some() {{ {} }}",
-            e.access.field(value, model, i),
-            sub.fail("Range")
-        );
+        if m.others.is_some() {
+            let list: Vec<String> = evaluated.iter().map(|n| format!("{n:?}")).collect();
+            let _ = writeln!(
+                out,
+                "for (k, _) in {} {{ if ![{}].contains(&k) {{ {} }} }}",
+                e.access.others(value, model)?,
+                list.join(", "),
+                self.at.under("*").fail("Range")
+            );
+        }
+        Ok(out)
     }
-    if m.others.is_some() {
-        let list = evaluated
-            .iter()
-            .map(|n| format!("{n:?}"))
-            .collect::<Vec<_>>();
-        let sub = at.under("*");
-        let _ = writeln!(
-            out,
-            "for (k, _) in {} {{ if ![{}].contains(&k) {{ {} }} }}",
-            e.access.others(value, model)?,
-            list.join(", "),
-            sub.fail("Range")
-        );
-    }
-    Ok(out)
 }
