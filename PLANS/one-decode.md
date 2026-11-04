@@ -64,8 +64,8 @@ Built first, at today's reader, so its figures are the baseline.
 
 ## Where it stands
 
-- schema-emit: on main and pushed at db0551f: the cost harness, the emitted `Deserialize` with skips, and their docs.
-- cel-emit: worktree `../cel-emit-wt-type-args`, branch `worktree-agent-type-args`: type arguments (the typed decode and `Decls.fill`/`Decls.rest` go), `Messages::serializes`, a dyn filling a message or list through its `Deserialize`, 128-bit widths, a model field converting a number when it can (past width `range`). In its working tree, not yet in a commit: the pin at schema-emit db0551f, the program's `__s` alias and its decode through `decode::json`, `json::own` writing a self-serializing message's text, and a number-rule test's stale case. All tests pass but the `answer_rows` allocation gate. Squash its `docs/extras.md` edits into one markdown commit at landing.
+- schema-emit: on main and pushed at 875dcb8: the cost harness, the emitted `Deserialize` with skips, `x-strip-additional`, and their docs.
+- cel-emit: on main and pushed at 395d6ca, pinning schema-emit 875dcb8: type arguments, the typed decode gone. `answer_rows` strips its models' undeclared keys: decode 51 allocation calls against the reference's 51.
 - loom: worktree `/Users/kaicurry/dev/loom/.claude/worktrees/one-decode`, branch `worktree-agent-one-decode`, most of it in the working tree, not in a commit: the loom `[patch]` block pointing at both worktrees blocks commits by the guard; it goes for rev pins at landing. Two commits on the branch (`f8a9b89b`, `17c5b165`) moved the wire to JSON and are undone in the working tree; drop them when squashing.
 
 Open in loom:
@@ -77,10 +77,9 @@ Open in loom:
 - `decode_fuel::a_key_the_model_leaves_out_is_kept_at_a_cost_per_byte`: an open model's unread keys, kept and written back, under 120 fuel a byte. Branch with skips: 111 compact, 97 indented. Loom main's reader on the same pass: 343 (173 keeping them, unwritten). Main's bound of 25 was a closed model skipping its unread keys, which now fail it. For loom's commit body.
 - Not yet run: cold test time against main, the workspace tests, clippy, the lefthook checks.
 
-Landing order: schema-emit to main and pushed; cel-emit pins it, to main and pushed; loom pins both revs, drops `[patch]`, to main. Each markdown commit shown to the user first; pushing asked first.
+Landing order: loom pins both revs, drops `[patch]`, to main. Each markdown commit shown to the user first; pushing asked first.
 
 ## What's left before landing
 
-1. schema-emit: `x-strip-additional` (IR `Model.additional`: fail, keep, strip), to main and pushed. cel-emit's `answer_rows` schema strips, so its decode does the reference's work: 129 allocation calls against 51 today, 50 against 50 without the extra keys.
-2. Loom: whether `docs/steps.md` offers strip as a model's third choice, or loom refuses the keyword. Loom's `models/extra.rs` and `forms.rs` read `Model.open`.
-3. The landing checks: cold test time against main, workspace tests, clippy, lefthook. Then squash, and show you the markdown commits.
+1. Loom offers strip: `docs/steps.md`, `functions.md`, and `containment.md` say so, in the loom worktree. Loom pins schema-emit 875dcb8 and cel-emit 395d6ca, drops `[patch]`, reads `Model.additional` in `models/extra.rs` and `forms.rs`, and `decode_fuel` gains a strip case with its own bound.
+2. The landing checks: cold test time against main, workspace tests, clippy, lefthook. Then squash, and show you the markdown commits.
