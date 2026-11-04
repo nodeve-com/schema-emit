@@ -12,6 +12,9 @@
 //! An `object` with no `properties` and `additionalProperties` a schema is a map, each value of
 //! that schema, unless a keyword names or counts its keys.
 //!
+//! `x-strip-additional: true` on an open model drops the keys nothing reads, rather than keeping
+//! them as text; beside a closed object it is invalid.
+//!
 //! Stub: the rest of the object keywords are unsupported.
 
 use serde_json::{Map, Value};
@@ -19,8 +22,11 @@ use serde_json::{Map, Value};
 use super::bounds::count;
 use super::others::{closed, needed, reads};
 use super::{Done, Key, Lower};
-use crate::ir::{Base, Check, Field, Model, Ty};
+use crate::ir::{Additional, Base, Check, Field, Model, Ty};
 use crate::Error;
+
+/// The keyword dropping an open model's unread keys.
+const STRIP: &str = "x-strip-additional";
 
 /// Whether a value of `schema` may hold a key no field names: an object not closed, one with
 /// such a field or item, or a `$ref` (not followed here, so counted as open).
@@ -84,6 +90,25 @@ pub(super) fn field_lists(
     Ok((required, props))
 }
 
+/// What a model of `s` does with its unread keys: fail where the schema closes it, drop them
+/// under `x-strip-additional`, else keep them.
+fn additional(name: &str, s: &Map<String, Value>) -> Result<Additional, Error> {
+    let closed = closed(s) || s.get("unevaluatedProperties") == Some(&Value::Bool(false));
+    let strip = match s.get(STRIP) {
+        None | Some(Value::Bool(false)) => false,
+        Some(Value::Bool(true)) => true,
+        Some(other) => return Err(Error::invalid(format!("{name}: `{STRIP}` of {other}"))),
+    };
+    match (closed, strip) {
+        (true, true) => Err(Error::invalid(format!(
+            "{name}: `{STRIP}` beside a closed object"
+        ))),
+        (true, false) => Ok(Additional::Fail),
+        (false, true) => Ok(Additional::Strip),
+        (false, false) => Ok(Additional::Keep),
+    }
+}
+
 pub(super) fn base(lower: &mut Lower, name: &str, s: &Map<String, Value>) -> Result<Base, Error> {
     let (required, props) = field_lists(name, s)?;
     let item = s.get("additionalProperties").filter(|v| v.is_object());
@@ -106,6 +131,7 @@ pub(super) fn base(lower: &mut Lower, name: &str, s: &Map<String, Value>) -> Res
             required: required.contains(field),
         });
     }
+    let additional = additional(name, s)?;
     lower.fill(
         index,
         Model {
@@ -113,7 +139,7 @@ pub(super) fn base(lower: &mut Lower, name: &str, s: &Map<String, Value>) -> Res
             fields,
             checks: Vec::new(),
             others: needed(s, &props, &required).then(|| Ty::of(Base::Any)),
-            open: !closed(s) && s.get("unevaluatedProperties") != Some(&Value::Bool(false)),
+            additional,
         },
     );
     Ok(Base::Model(index))
@@ -123,6 +149,8 @@ pub(super) fn keyword(k: &mut Key) -> Done {
     let model = matches!(k.ty.base, Base::Model(_));
     match k.key {
         "properties" | "$ref" | "$defs" => Some(Ok(())),
+        STRIP if matches!(k.value, Value::Bool(_)) => Some(Ok(())),
+        STRIP => k.refuse(),
         "additionalProperties" if !model || *k.value == Value::Bool(false) => Some(Ok(())),
         "minProperties" | "maxProperties" => {
             let Some(n) = count(k.value) else {

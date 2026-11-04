@@ -8,6 +8,7 @@ nullable	0
 open_model	2	unread keys are kept as text: one allocation for it, one more inside the reader
 optional	1
 optional_nullable	1
+strip_model	1	unread keys are skipped without being kept: the one allocation is the reader's
 timestamp	0
 union	5	a failing branch's error is serde_json's, which boxes it; the open first branch keeps its unread key
 wide_integers	0

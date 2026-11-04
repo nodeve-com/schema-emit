@@ -12,7 +12,7 @@
 use std::fmt::Write as _;
 
 use super::{decode::d, idents, tuple_of, StdForm};
-use crate::ir::{Base, Model, Ty};
+use crate::ir::{Additional, Base, Model, Ty};
 
 impl StdForm<'_> {
     /// Each union's and each model's `Serialize` impl.
@@ -94,10 +94,10 @@ impl StdForm<'_> {
     fn encode_positions(&self, m: &Model) -> String {
         let names = idents::of(m);
         let ser = d("ser");
-        let others = match (&m.others, m.open) {
+        let others = match (&m.others, m.additional) {
             (Some(held), _) => Some(format!("{ser}::Entries({})", self.writer(held))),
-            (None, true) => Some(format!("{ser}::Plain")),
-            (None, false) => None,
+            (None, Additional::Keep) => Some(format!("{ser}::Plain")),
+            (None, _) => None,
         };
         let mut out = format!(
             "let mut t = s.serialize_tuple({})?; ",
@@ -125,13 +125,15 @@ impl StdForm<'_> {
     /// The code writing the keys of model `m` that no field names.
     fn encode_others(&self, m: &Model) -> String {
         let others = idents::of(m).others;
-        match (&m.others, m.open) {
+        match (&m.others, m.additional) {
             (Some(held), _) => {
                 let entry = format!("&{}::With(v, {})", d("ser"), self.writer(held));
                 format!("for (k, v) in &self.{others} {{ m.serialize_entry(k, {entry})?; }} ")
             }
-            (None, true) => format!("{}(&mut m, &self.{others})?; ", d("members")),
-            (None, false) => String::new(),
+            (None, Additional::Keep) => {
+                format!("{}(&mut m, &self.{others})?; ", d("members"))
+            }
+            (None, _) => String::new(),
         }
     }
 

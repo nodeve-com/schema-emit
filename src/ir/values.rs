@@ -1,4 +1,17 @@
-//! What a check or a type carries as data: numbers, literals, notes.
+//! What a check, a type, or a model carries as data: numbers, literals, notes, the treatment of
+//! unread keys.
+
+/// What a decode does with a model's keys that no field names and no check reads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Additional {
+    /// The decode fails at such a key.
+    #[default]
+    Fail,
+    /// The decode keeps such keys as one raw text, which a write puts back.
+    Keep,
+    /// The decode accepts such keys and drops them without keeping them.
+    Strip,
+}
 
 /// A number in a schema, as written.
 #[derive(Clone, Copy, Debug, PartialEq)]

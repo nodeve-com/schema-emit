@@ -13,6 +13,8 @@ mod reserved;
 #[allow(dead_code)]
 #[path = "suite/run.rs"]
 mod run;
+#[path = "decode/strip.rs"]
+mod strip;
 
 use schema_emit::emit::std_form::{names, StdForm};
 use schema_emit::json_schema::lower;
@@ -194,6 +196,7 @@ fn the_decode_and_the_encode_follow_their_rules() {
         ("shapes", shapes(), SHAPES),
         ("stamped", binary::stamped(), binary::STAMPED),
         ("every", binary::every(), binary::EVERY),
+        ("strip", strip::schema(), strip::CHECK),
         ("reserved", reserved::schema(), reserved::CHECK),
         ("alias", reserved::alias(), reserved::ALIAS),
     ];

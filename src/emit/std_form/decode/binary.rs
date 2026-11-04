@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 
 use super::d;
 use crate::emit::std_form::{idents, StdForm};
-use crate::ir::{Model, Union};
+use crate::ir::{Additional, Model, Union};
 
 impl StdForm<'_> {
     /// The `binary` method of the `Kinds` impl reading model `i`.
@@ -24,10 +24,10 @@ impl StdForm<'_> {
             let _ = write!(reads, "let f{k} = {}; ", next(&seed));
             let _ = write!(init, "{n}: f{k}, ");
         }
-        let kept = match (&m.others, m.open) {
+        let kept = match (&m.others, m.additional) {
             (Some(held), _) => Some(format!("{}({})", d("map"), self.seed(held, None))),
-            (None, true) => Some(format!("{}()", d("text"))),
-            (None, false) => None,
+            (None, Additional::Keep) => Some(format!("{}()", d("text"))),
+            (None, _) => None,
         };
         if let Some(seed) = &kept {
             let _ = write!(reads, "let o = {}; ", next(seed));

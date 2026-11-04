@@ -3,7 +3,7 @@
 use std::fmt::Write as _;
 
 use super::Access;
-use crate::ir::{Base, Float, Model, Schema, Ty, Union};
+use crate::ir::{Additional, Base, Float, Model, Schema, Ty, Union};
 use crate::Error;
 
 mod decode;
@@ -251,7 +251,7 @@ impl<'a> StdForm<'a> {
                 "pub {}: ::std::vec::Vec<(::std::string::String, {held})>, ",
                 names.others
             );
-        } else if m.open {
+        } else if m.additional == Additional::Keep {
             let _ = write!(fields, "pub {}: ::std::string::String, ", names.others);
         }
         fields

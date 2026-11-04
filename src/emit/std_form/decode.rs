@@ -17,7 +17,7 @@
 use std::fmt::Write as _;
 
 use super::{idents, StdForm};
-use crate::ir::Model;
+use crate::ir::{Additional, Model, Ty};
 use crate::Error;
 
 mod binary;
@@ -130,7 +130,7 @@ impl StdForm<'_> {
         }
         if m.others.is_some() {
             let _ = write!(init, "{}: ::std::vec::Vec::new(), ", names.others);
-        } else if m.open {
+        } else if m.additional == Additional::Keep {
             let _ = write!(init, "{}: ::std::string::String::new(), ", names.others);
         }
         format!("Ok({} {{ {init}}})", self.model_name(i))
@@ -205,27 +205,38 @@ impl StdForm<'_> {
         out
     }
 
+    /// The code of model `m`'s keys no field names, kept as typed values of `held`.
+    fn unnamed_typed(&self, m: &Model, held: &Ty) -> Unnamed {
+        let read = format!("|| m.next_value_seed({})", self.seed(held, None));
+        Unnamed {
+            decl: "let mut o = ::std::vec::Vec::new(); ".into(),
+            init: format!("{}: o, ", idents::of(m).others),
+            arm: format!(
+                "{}::Other(k) => {}::other(&mut o, k, {read})?, ",
+                d("Slot"),
+                d("Parts")
+            ),
+            keep: true,
+        }
+    }
+
     /// What model `m` does with a key no field names.
     fn unnamed(&self, m: &Model) -> Unnamed {
         let slot = d("Slot");
         match &m.others {
-            Some(held) => {
-                let read = format!("|| m.next_value_seed({})", self.seed(held, None));
-                Unnamed {
-                    decl: "let mut o = ::std::vec::Vec::new(); ".into(),
-                    init: format!("{}: o, ", idents::of(m).others),
-                    arm: format!(
-                        "{slot}::Other(k) => {}::other(&mut o, k, {read})?, ",
-                        d("Parts")
-                    ),
-                    keep: true,
-                }
-            }
-            None if m.open => Unnamed {
+            Some(held) => self.unnamed_typed(m, held),
+            None if m.additional == Additional::Keep => Unnamed {
                 decl: format!("let mut o = {}::default(); ", d("Unread")),
                 init: format!("{}: o.text(), ", idents::of(m).others),
                 arm: format!("{slot}::Other(k) => o.push(&k, &mut m)?, "),
                 keep: true,
+            },
+            None if m.additional == Additional::Strip => Unnamed {
+                arm: format!(
+                    "{slot}::Other(_) => {{ m.next_value::<{}>()?; }} ",
+                    d("IgnoredAny")
+                ),
+                ..Unnamed::default()
             },
             None => Unnamed {
                 arm: format!(
