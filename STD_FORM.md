@@ -4,7 +4,7 @@ Values as standard Rust, for use anywhere: a struct per model, named by a functi
 - A number keeps its width: an integer is the Rust integer of its name, a float `f32` or `f64`. Text is `String`, bytes `Vec<u8>`, a timestamp `chrono::DateTime<chrono::Utc>`, a duration `chrono::TimeDelta`, a list `Vec`, a map a `Vec` of pairs. A value of any kind is a `serde_json::Value`, a null `()`.
 - A `Box` wraps only a field whose type holds its own model.
 - A union is an enum, a variant per branch, named by its `$defs` key, else its branches' types joined by `Or`.
-- Keys no field names become typed values if a check reads them, else text if the model is open, else a failure.
+- Keys no field names become typed values if a check reads them, else text if the model is open, else a failure. An open model with `x-strip-additional: true` drops those keys instead: it has no field for them, and `Serialize` writes none. The keyword beside a closed model is invalid.
 
 [`StdForm`] is the [`Access`](super::Access) to these types. Beside each struct it writes a serde `Deserialize` and `Serialize` impl and the function `decode_<name>` (snake case, same rule).
 

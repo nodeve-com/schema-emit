@@ -18,7 +18,7 @@ Emitted checks link this crate, not schema-emit, which depends on serde_json and
 
 A format that is not human-readable gets a positional form, with no intermediate value:
 
-- A model is its fields in order, an optional one an option, then its kept keys: a list of key and value, else their text.
+- A model is its fields in order, an optional one an option, then its kept keys: a list of key and value, else their text, else nothing where the model strips them.
 - A map is a list of key and value; a repeated key in text keeps its place and takes the later value.
 - A timestamp is whole seconds then nanoseconds, a duration as chrono writes it, bytes raw.
 - A tuple is an option per position, then the list of the rest.
