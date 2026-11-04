@@ -1,4 +1,4 @@
-#![doc = include_str!("../../STD_FORM.md")]
+#![doc = include_str!("../../docs/std-form.md")]
 
 use std::fmt::Write as _;
 

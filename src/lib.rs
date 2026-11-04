@@ -8,7 +8,7 @@ pub mod json_schema;
 pub mod emit;
 pub mod ir;
 pub mod matching;
-#[doc = include_str!("../MISSING.md")]
+#[doc = include_str!("../docs/missing.md")]
 pub mod missing {}
 
 /// Why a schema doesn't lower or emit: its kind, and what, where.
