@@ -2,8 +2,8 @@
 
 A **schema** describes what valid data looks like: which fields it has and which values it allows. schema-emit reads a [JSON Schema](https://json-schema.org) and writes Rust, for any caller:
 
-- **Standard Rust types.** A struct per model ([`emit::std_form::StdForm`]), its fields named from the schema, with a serde `Deserialize` and `Serialize` it writes out.
-- **Checks over a value you already hold.** With your own structs, you say how to read each field ([`emit::Access`]).
+- **Standard Rust types.** A struct per object model, and a value's own type for any other ([`emit::std_form::StdForm`]), its fields named from the schema, with a serde `Deserialize` and `Serialize` it writes out.
+- **Extra keys dropped, kept, or refused.** `x-strip-additional: true` drops keys no field names ([`emit::std_form`] § Extra keys lists all three).
 - **Models written elsewhere.** You can say another module holds a model ([`emit::std_form::StdForm::with_external`]).
 - **Common value types.** Timestamps and durations are `chrono`'s. `format: human-duration` reads an optional sign, then humantime's text, such as `1.5s`.
 - **Annotations you name.** A keyword such as a unit rides along when you ask for it. schema-emit refuses any other.
@@ -58,7 +58,7 @@ Why an emitted `Deserialize`, not `#[derive(Deserialize)]`: a union takes its fi
 ## Use
 
 1. [`json_schema::lower`] takes the keywords to carry (`notes`) and returns an [`ir::Schema`], the IR the emitter reads, and the named model's index. [`json_schema::lower_defs`] takes every `$defs` entry of a rootless document. A definition named twice is one model. The default `json-schema` feature holds it.
-2. [`emit::Emitter`] writes one function per model, through the embedder's [`emit::Access`]: how fields, text, and lists read, and each Rust type.
+2. [`emit::Emitter`] writes one function per model, through an [`emit::Access`]: how fields, text, and lists read, and each Rust type.
 3. The embedder writes the crate around it: `use ::schema_emit_runtime as __s;`, the model types, and a call passing a `Report`. schema-emit builds nothing.
 
 [`emit::std_form`] has the standard form: each Rust type, `decode_<name>`, and `Serialize`.
