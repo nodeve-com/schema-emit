@@ -4,7 +4,7 @@
 use std::string::String;
 use std::vec::Vec;
 
-use serde::de::{self, DeserializeSeed, IgnoredAny, SeqAccess};
+use serde::de::{self, DeserializeSeed, IgnoredAny, MapAccess, SeqAccess};
 
 use super::skips::{self, mark};
 use super::Unfit;
@@ -39,25 +39,28 @@ fn part<T, E: de::Error>(
 }
 
 impl Parts {
-    /// The field named `name` (a path step, `.name`) has the value `read` gives, into `slot`.
-    /// The skips noted while it reads are led by the field.
-    pub fn field<T, E: de::Error>(
-        slot: &mut Option<T>,
+    /// The field named `name` (a path step, `.name`) has the value `seed` reads of `m`'s next
+    /// value, into `slot`. The skips noted while it reads are led by the field. Fields that share a
+    /// seed type share one instance.
+    pub fn field<'de, A: MapAccess<'de>, S: DeserializeSeed<'de>>(
+        slot: &mut Option<S::Value>,
         name: &'static str,
-        read: impl FnOnce() -> Result<T, E>,
-    ) -> Result<(), E> {
-        *slot = Some(part(read, |u| u.step(name))?);
+        m: &mut A,
+        seed: S,
+    ) -> Result<(), A::Error> {
+        *slot = Some(part(|| m.next_value_seed(seed), |u| u.step(name))?);
         Ok(())
     }
 
-    /// The optional field `name`, whose `read` gives nothing where the value was skipped: the
+    /// The optional field `name`, whose `seed` gives nothing where the value was skipped: the
     /// slot keeps what it had.
-    pub fn optional<T, E: de::Error>(
+    pub fn optional<'de, A: MapAccess<'de>, T, S: DeserializeSeed<'de, Value = Option<T>>>(
         slot: &mut Option<T>,
         name: &'static str,
-        read: impl FnOnce() -> Result<Option<T>, E>,
-    ) -> Result<(), E> {
-        if let Some(v) = part(read, |u| u.step(name))? {
+        m: &mut A,
+        seed: S,
+    ) -> Result<(), A::Error> {
+        if let Some(v) = part(|| m.next_value_seed(seed), |u| u.step(name))? {
             *slot = Some(v);
         }
         Ok(())

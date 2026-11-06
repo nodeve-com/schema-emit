@@ -200,10 +200,10 @@ impl StdForm<'_> {
             let step = format!(".{}", f.name);
             let arm = match f.required {
                 true => {
-                    format!("{parts}::field(&mut f{k}, {step:?}, || m.next_value_seed({seed}))?")
+                    format!("{parts}::field(&mut f{k}, {step:?}, &mut m, {seed})?")
                 }
                 false => format!(
-                    "{parts}::optional(&mut f{k}, {step:?}, || m.next_value_seed({}({seed})))?",
+                    "{parts}::optional(&mut f{k}, {step:?}, &mut m, {}({seed}))?",
                     d("skip")
                 ),
             };

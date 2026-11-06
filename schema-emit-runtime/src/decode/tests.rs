@@ -43,9 +43,9 @@ impl<'de> Kinds<'de> for PairKinds {
         let (mut a, mut b) = (None, None);
         while let Some(k) = m.next_key_seed(Names::new(&["a", "b"], true))? {
             match k {
-                Slot::Field(0) => Parts::field(&mut a, ".a", || m.next_value_seed(int::<i64>()))?,
+                Slot::Field(0) => Parts::field(&mut a, ".a", &mut m, int::<i64>())?,
                 Slot::Field(1) => {
-                    Parts::optional(&mut b, ".b", || m.next_value_seed(skip(int::<i64>())))?;
+                    Parts::optional(&mut b, ".b", &mut m, skip(int::<i64>()))?;
                 }
                 Slot::Field(_) => drop(m.next_value::<IgnoredAny>()?),
                 Slot::Other(k) => return Err(Parts::unnamed(&k)),
