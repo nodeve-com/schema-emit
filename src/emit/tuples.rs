@@ -30,7 +30,7 @@ impl Walk<'_, '_> {
             let body = self.within(&format!("[{i}]"), |w| w.value(&y, p));
             out.push_str(&format!(
                 "if let Some({y}) = {} {{ {}}}\n",
-                self.e.access.element(value, i),
+                self.e.std.element(value, i),
                 body?
             ));
         }
@@ -58,8 +58,8 @@ impl Walk<'_, '_> {
             let eq = self.same(&p, &q, a)?;
             out.push_str(&format!(
                 "if let (Some({p}), Some({q})) = ({}, {}) {{ if {eq} {{ {found} = true; }} }}\n",
-                self.e.access.element(value, i),
-                self.e.access.element(value, j)
+                self.e.std.element(value, i),
+                self.e.std.element(value, j)
             ));
         }
         out.push_str(&format!("if {found} {{ {} }}\n", self.at.fail("Duplicate")));

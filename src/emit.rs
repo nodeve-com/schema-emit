@@ -1,6 +1,6 @@
 //! The IR as Rust: one function per model checking a value of it, each field's checks inline with
-//! its path and bounds as literals, failures sent to a `schema_emit_runtime::Report`. How a value
-//! reads is the embedder's ([`Access`]); every name the code writes is generated.
+//! its path and bounds as literals, failures sent to a `schema_emit_runtime::Report`. A value
+//! reads as the std form's ([`std_form::StdForm`]); every name the code writes is generated.
 //!
 //! A value binds to a view of its base, which each check reads: an integer `i128`, a float
 //! `f64`, a bool, text `&str`, a list its item count `u64`. A check is a condition on the view;
@@ -29,52 +29,15 @@ mod walk;
 use std::cell::{Cell, RefCell};
 use std::fmt::Write as _;
 
-use crate::ir::{Base, Check, Lit, Model, Schema, Ty, Union};
+use crate::ir::{Base, Check, Lit, Model, Schema, Ty};
 use crate::Error;
 use at::At;
+use std_form::StdForm;
 use walk::Walk;
 
 /// The runtime crate, as the emitted code names it, under a name no model takes: the embedder
 /// writes `use ::schema_emit_runtime as __s;` beside it.
 pub const STD: &str = "__s";
-
-/// How the embedder's values read, each method a Rust expression.
-pub trait Access {
-    /// The Rust type of a value of `ty`: an `Option` of its base where it is nullable.
-    fn rust(&self, schema: &Schema, ty: &Ty) -> Result<String, Error>;
-    /// `Option<&T>`: field `field` of model `model`, read from `value`, a `&` of the model's type.
-    fn field(&self, value: &str, model: usize, field: usize) -> String;
-    /// `Option<&T>`: position `index` of the tuple `value`, a `&` of the tuple's type.
-    fn element(&self, value: &str, index: usize) -> String {
-        format!("{value}.{index}.as_ref()")
-    }
-    /// `Result<&str, _>`: the text `value`, a `&` of text's type, reads as.
-    fn text(&self, value: &str) -> String {
-        format!("Ok::<&str, ()>({value}.as_str())")
-    }
-    /// `Result<impl Iterator, _>`: a list's items, each a `T` or a `&T`.
-    fn items(&self, value: &str) -> String {
-        format!("Ok::<_, ()>({value}.iter())")
-    }
-    /// An iterator of `(&str, &T)`: each key of model `model` no field names, with its value,
-    /// read from `value`. An embedder with no such keys has none to give.
-    fn others(&self, _value: &str, _model: usize) -> Result<String, Error> {
-        Err(Error::unsupported("keys no field names"))
-    }
-    /// An iterator of `(&str, &T)`: each entry of the map `value`, a `&` of the map's type.
-    fn entries(&self, _value: &str) -> Result<String, Error> {
-        Err(Error::unsupported("maps"))
-    }
-    /// `Option<&T>`: variant `index` of `value`, a `&` of the type of `union`; `None` where the
-    /// value holds another.
-    fn variant(&self, _value: &str, _union: &Union, _index: usize) -> Result<String, Error> {
-        Err(Error::unsupported("unions"))
-    }
-    /// `Option<&T>`: the value of the key no field names that `key`, a `&str`, is.
-    fn other(&self, _value: &str, _model: usize, _key: &str) -> Result<String, Error> {
-        Err(Error::unsupported("keys no field names"))
-    }
-}
 
 /// A check's name, and each pattern in it with its table.
 type Tables = (String, Vec<(String, Vec<u8>)>);
@@ -82,7 +45,8 @@ type Tables = (String, Vec<(String, Vec<u8>)>);
 /// Emits checks over one schema.
 pub struct Emitter<'a> {
     pub schema: &'a Schema,
-    pub access: &'a dyn Access,
+    /// The types the checks read.
+    pub std: &'a StdForm<'a>,
     /// The check being emitted.
     tables: RefCell<Tables>,
     /// The model whose function is being written, until its first value is.
@@ -105,7 +69,7 @@ impl<'a> Emitter<'a> {
     /// Model `model` and its Rust type.
     fn parts(&self, model: usize) -> Result<(&'a Model, String), Error> {
         let m = self.model(model)?;
-        let rust = self.access.rust(self.schema, &Ty::of(Base::Model(model)))?;
+        let rust = self.std.rust(&Ty::of(Base::Model(model)));
         Ok((m, rust))
     }
 

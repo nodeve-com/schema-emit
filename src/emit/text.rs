@@ -18,7 +18,7 @@ impl Walk<'_, '_> {
             return Ok(String::new());
         }
         let body = guard(&self.at, &conds);
-        Ok(readable(&self.at, &self.e.access.text(value), &view, &body))
+        Ok(readable(&self.at, &self.e.std.text(value), &view, &body))
     }
 }
 

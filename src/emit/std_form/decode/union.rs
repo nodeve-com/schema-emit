@@ -17,7 +17,7 @@ impl StdForm<'_> {
     pub(super) fn union_decoder(&self, union: &Union) -> ::core::result::Result<String, Error> {
         let name = self.union_name(union);
         let ok = format!("ok_{}", idents::snake(&name));
-        let mut out = Emitter::new(self.schema, self).check_union(union, &ok)?;
+        let mut out = Emitter::new(self).check_union(union, &ok)?;
         let mut tries = String::new();
         for (i, variant) in union.variants.iter().enumerate() {
             tries.push_str(&format!(

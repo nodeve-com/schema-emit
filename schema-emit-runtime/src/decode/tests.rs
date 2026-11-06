@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::format;
 use std::string::{String, ToString as _};
+use std::vec;
 use std::vec::Vec;
 
 use serde_json::json;
@@ -155,7 +156,12 @@ fn depth_is_serde_jsons() {
     assert!(read(&deep(128), any()).is_err());
     assert!(read(&std::format!("[1, {}]", deep(127)), list(any())).is_err());
     assert!(read(&deep(128), of::<Pair>()).is_err());
-    assert_eq!(read(&deep(3), any()), Ok(json!([[[]]])));
+    assert_eq!(
+        read(&deep(3), any()),
+        Ok(any_value::Value::List(vec![any_value::Value::List(vec![
+            any_value::Value::List(vec![])
+        ])]))
+    );
 }
 
 #[test]

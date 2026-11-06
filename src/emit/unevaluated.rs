@@ -23,7 +23,7 @@ impl Walk<'_, '_> {
             let _ = writeln!(
                 out,
                 "if ({}).is_some() {{ {} }}",
-                e.access.field(value, model, i),
+                e.std.field(value, model, i),
                 self.at.under(&f.name).fail("Range")
             );
         }
@@ -32,7 +32,7 @@ impl Walk<'_, '_> {
             let _ = writeln!(
                 out,
                 "for (k, _) in {} {{ if ![{}].contains(&k) {{ {} }} }}",
-                e.access.others(value, model)?,
+                e.std.others(value, model)?,
                 list.join(", "),
                 self.at.under("*").fail("Range")
             );

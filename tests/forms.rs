@@ -190,3 +190,45 @@ fn an_embedder_reads_the_names_the_emitted_code_uses() {
     assert_eq!(form.decoder(0), "decode_foo_bar");
     assert_eq!(form.decoder(1), "decode_foo_bar_");
 }
+
+#[test]
+fn a_value_root_is_an_alias_of_its_value_type() {
+    let int = rooted(&json!({ "type": "integer", "format": "int8" }));
+    assert!(int.contains("pub type Root = i8;"), "{int}");
+    let list =
+        rooted(&json!({ "type": "array", "items": { "type": "integer", "format": "int8" } }));
+    assert!(
+        list.contains("pub type Root = ::std::vec::Vec<i8>;"),
+        "{list}"
+    );
+    assert!(!list.contains("pub struct Root"), "{list}");
+    assert!(!list.contains("for Root "), "{list}");
+    assert!(list.contains("pub fn decode_root<"), "{list}");
+    assert!(list.contains("pub fn encode_root<"), "{list}");
+}
+
+#[test]
+fn a_value_holding_itself_is_a_struct_the_root_aliases_a_list_of() {
+    let schema = json!({ "type": "array", "items": { "$ref": "#" } });
+    let items = rooted(&schema);
+    assert!(items.contains("pub struct Root {"), "{items}");
+    assert!(!items.contains("pub type Root ="), "{items}");
+    assert!(
+        items.contains("pub type Root2 = ::std::vec::Vec<Root>;"),
+        "{items}"
+    );
+}
+
+#[test]
+fn any_and_null_are_any_values_types() {
+    let any =
+        rooted(&json!({ "type": "object", "properties": { "a": {}, "n": { "type": "null" } } }));
+    assert!(
+        any.contains("pub a: ::core::option::Option<::any_value::Value>"),
+        "{any}"
+    );
+    assert!(
+        any.contains("pub n: ::core::option::Option<::any_value::Null>"),
+        "{any}"
+    );
+}

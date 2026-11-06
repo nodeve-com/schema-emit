@@ -17,7 +17,7 @@ impl Walk<'_, '_> {
         let at = &mut self.at;
         let (count, index, each, items) =
             (at.local("c"), at.local("i"), at.local("x"), at.local("l"));
-        let rust = e.access.rust(e.schema, item)?;
+        let rust = e.std.rust(item);
         let body = self.within("[]", |w| {
             w.at.indices.push(index.clone());
             let body = w.value(&each, item);
@@ -43,7 +43,7 @@ impl Walk<'_, '_> {
              let {each}: &{rust} = ::core::borrow::Borrow::borrow(&{each});\n{body}{step}}}\n{dup}{}",
             guard(&self.at, &conds)
         );
-        Ok(readable(&self.at, &e.access.items(value), &items, &walk))
+        Ok(readable(&self.at, &e.std.iter(value), &items, &walk))
     }
 
     /// The counter declaration and the per-item step of `check`, a `contains`: `hits` counts the
@@ -129,7 +129,7 @@ impl Walk<'_, '_> {
                 let conds = e.conds(&ty.base, &ty.checks, &view)?;
                 Ok(format!(
                     "match {} {{ Ok({view}) => {}, Err(_) => false }}",
-                    e.access.text(value),
+                    e.std.text(value),
                     all(&conds)
                 ))
             }
@@ -159,7 +159,7 @@ impl Walk<'_, '_> {
             at.local("q"),
         );
         let eq = self.same(&p, &q, item)?;
-        let items = self.e.access.items(value);
+        let items = self.e.std.iter(value);
         Ok(format!(
             "let mut {found} = false;\n\
              if let Ok(outer) = {items} {{ for ({i}, {p}) in outer.enumerate() {{ \
@@ -197,8 +197,8 @@ impl Walk<'_, '_> {
                 let (x, y) = (self.at.local("s"), self.at.local("s"));
                 format!(
                     "match ({}, {}) {{ (Ok({x}), Ok({y})) => {x} == {y}, _ => false }}",
-                    e.access.text(a),
-                    e.access.text(b)
+                    e.std.text(a),
+                    e.std.text(b)
                 )
             }
             Base::List(item) => self.same_items(a, b, item)?,
@@ -227,7 +227,7 @@ impl Walk<'_, '_> {
 
     /// `a` and `b`, each a `&` of a list of `item`, equal item by item.
     fn same_items(&mut self, a: &str, b: &str, item: &Ty) -> Result<String, Error> {
-        let rust = self.e.access.rust(self.e.schema, item)?;
+        let rust = self.e.std.rust(item);
         let at = &mut self.at;
         let (xs, ys, p, q) = (at.local("l"), at.local("l"), at.local("p"), at.local("q"));
         let eq = self.same(&p, &q, item)?;
@@ -241,8 +241,8 @@ impl Walk<'_, '_> {
              if !({eq}) {{ break false; }} }} \
              _ => break false, }} }}, \
              _ => false }}",
-            self.e.access.items(a),
-            self.e.access.items(b)
+            self.e.std.iter(a),
+            self.e.std.iter(b)
         ))
     }
 
@@ -256,8 +256,8 @@ impl Walk<'_, '_> {
             conds.push(format!(
                 "match ({}, {}) {{ (None, None) => true, (Some({x}), Some({y})) => ({eq}), \
                  _ => false }}",
-                self.e.access.field(a, model, n),
-                self.e.access.field(b, model, n)
+                self.e.std.field(a, model, n),
+                self.e.std.field(b, model, n)
             ));
         }
         if conds.is_empty() {

@@ -3,7 +3,7 @@
 //! checks count its fields present, after the fields have checked, and fail `range` past them.
 //! A `Dependent` check fails `absent` at each field a present field requires and lacks.
 //!
-//! A map's entries read through [`Access::entries`], each value checked as the map's item type,
+//! A map's entries read through `StdForm::entries`, each value checked as the map's item type,
 //! at the map's path plus `.*`. Stub: a count or choice on a map. A model that refers to itself
 //! is called, not inlined (`recursion.rs`).
 
@@ -106,7 +106,7 @@ impl<'e> Walk<'_, 'e> {
                     .get(*index)
                     .ok_or_else(|| Error::invalid(format!("{}: no field {index}", m.name)))?;
                 Slot {
-                    read: self.e.access.field(value, model, *index),
+                    read: self.e.std.field(value, model, *index),
                     name: f.name.clone(),
                     ty,
                     required: *required,
@@ -181,14 +181,14 @@ impl<'e> Walk<'_, 'e> {
             let _ = writeln!(
                 tally,
                 "if {}.is_some() {{ {count} = {count}.saturating_add(1); }}",
-                e.access.field(value, model, i)
+                e.std.field(value, model, i)
             );
         }
         if m.others.is_some() {
             let _ = writeln!(
                 tally,
                 "{count} = {count}.saturating_add({}.count() as u64);",
-                e.access.others(value, model)?
+                e.std.others(value, model)?
             );
         }
         let conds = counts
@@ -232,7 +232,7 @@ impl<'e> Walk<'_, 'e> {
         let body = self.within(".*", |w| w.value(&x, item));
         Ok(format!(
             "for (_, {x}) in {} {{ {}}}\n",
-            self.e.access.entries(value)?,
+            self.e.std.entries(value),
             body?
         ))
     }

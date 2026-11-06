@@ -27,7 +27,7 @@ impl Walk<'_, '_> {
         };
         Ok(format!(
             "match {} {{ Some({x}) => {{ {body}}} None => {{ {absent} }} }}\n",
-            self.e.access.field(value, model, index)
+            self.e.std.field(value, model, index)
         ))
     }
 }

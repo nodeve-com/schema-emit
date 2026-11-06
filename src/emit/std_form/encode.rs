@@ -1,5 +1,5 @@
 //! Encoding the std types. Each model gets a serde `Serialize` impl, written out here rather than
-//! derived: an object of its fields in schema order, an absent optional field skipped, a nullable
+//! derived, except an alias, which gets the function `encode_<name>` taking a serializer: an object of its fields in schema order, an absent optional field skipped, a nullable
 //! value that is `None` as null, the keys a check reads as the typed values they are, and the
 //! keys nothing reads written back as they arrived. A union is its branch's value, untagged. A
 //! field is written through a writer composed from its type (`schema_emit_runtime::decode::ser`),
@@ -34,8 +34,12 @@ impl StdForm<'_> {
             out.push_str(&self.encoder(&name, &format!("match self {{ {arms}}}")));
         }
         for (i, m) in self.schema.models.iter().enumerate() {
-            if (self.external)(i).is_none() {
-                out.push_str(&self.encoder(&self.model_name(i), &self.encode_body(m)));
+            if (self.external)(i).is_some() {
+                continue;
+            }
+            match (self.is_alias(i), m.fields.first()) {
+                (true, Some(f)) => out.push_str(&self.alias_encoder(i, &f.ty)),
+                _ => out.push_str(&self.encoder(&self.model_name(i), &self.encode_body(m))),
             }
         }
         out
@@ -50,6 +54,19 @@ impl StdForm<'_> {
              use {ser} as _; use {serializer} as _; use {} as _; use {} as _; {body} }} }}\n",
             d("SerializeMap"),
             d("SerializeTuple"),
+        )
+    }
+
+    /// `encode_<name>` of alias model `i`, whose value of type `ty` has no `Serialize` impl to hold
+    /// the code.
+    fn alias_encoder(&self, i: usize, ty: &Ty) -> String {
+        let (ser, serializer) = (d("Serialize"), d("Serializer"));
+        format!(
+            "#[allow(dead_code, unused_imports)] pub fn encode_{}<__S: {serializer}>(v: &{}, s: __S) \
+             -> ::core::result::Result<__S::Ok, __S::Error> {{ use {ser} as _; {} }}\n",
+            self.decoder_id(i),
+            self.model_name(i),
+            self.written("v", ty),
         )
     }
 

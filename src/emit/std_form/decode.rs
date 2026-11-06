@@ -9,7 +9,7 @@
 //! that fails or is absent fails the model at once. An optional field that fails is absent and
 //! a skip (`Skips`), which `decode_<name>` returns beside the value. A key no field names fails a
 //! closed model, goes to the field of keys no field names if a check reads
-//! them, and is kept as text otherwise if the model is open. A model that is one value reads that value.
+//! them, and is kept as text otherwise if the model is open. A model that is one value reads that value; one that is an alias has no impl, only `decode_<name>`.
 //!
 //! In a format that isn't human-readable, the model's fields are read in order, as `binary.rs`
 //! writes the reading.
@@ -72,7 +72,7 @@ impl StdForm<'_> {
 
     /// The name of model `i`'s decode function, without `decode_`: its name in snake case, with
     /// `_` added while an earlier model's is the same.
-    fn decoder_id(&self, i: usize) -> String {
+    pub(super) fn decoder_id(&self, i: usize) -> String {
         let mut used: Vec<String> = Vec::new();
         for j in 0..=i {
             let mut id = idents::snake(&self.model_name(j));
@@ -90,14 +90,30 @@ impl StdForm<'_> {
         format!("decode_{}", self.decoder_id(i))
     }
 
-    /// Model `i`'s `decode_` function and `Deserialize` impl.
+    /// Model `i`'s `decode_` function and `Deserialize` impl, or its `decode_` function alone where it
+    /// is an alias, which no impl can be written for.
     fn model_decoder(&self, i: usize, m: &Model) -> String {
         let (name, id) = (self.model_name(i), self.decoder_id(i));
+        let (de, deser) = (d("Deserialize"), d("Deserializer"));
+        if let (true, Some(f)) = (self.is_alias(i), m.fields.first()) {
+            let seed = format!(
+                "{}::deserialize({}, d)",
+                d("DeserializeSeed"),
+                self.seed(&f.ty, None)
+            );
+            return format!(
+                "#[allow(dead_code)] pub fn decode_{id}<'de, __D: {deser}<'de>>(d: __D) \
+                 -> ::core::result::Result<({name}, {}), {}> {{ {}(|| {seed}, {:?}) }}\n",
+                d("Skips"),
+                d("Unfit"),
+                d("root"),
+                m.name,
+            );
+        }
         let body = match m.is_value() {
             true => self.value_body(i, m),
             false => self.object_body(i, m),
         };
-        let (de, deser) = (d("Deserialize"), d("Deserializer"));
         format!(
             "#[allow(dead_code)] pub fn decode_{id}<'de, __D: {deser}<'de>>(d: __D) \
              -> ::core::result::Result<({name}, {}), {}> {{ {}(|| <{name} as {de}<'de>>::deserialize(d), {:?}) }}\n\

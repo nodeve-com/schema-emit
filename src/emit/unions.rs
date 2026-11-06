@@ -1,5 +1,5 @@
 //! Area: unions. A value of [`Base::Union`] is one variant, each a branch's type. Its check matches
-//! the variant, read through [`Access::variant`], and runs that branch's check at the union's own
+//! the variant, read through `StdForm::read_variant`, and runs that branch's check at the union's own
 //! path, so a failure inside reports the path the branch gives.
 
 use std::fmt::Write as _;
@@ -18,7 +18,7 @@ impl Walk<'_, '_> {
         for (i, variant) in union.variants.iter().enumerate() {
             let held = self.at.local("u");
             let body = self.value(&held, variant)?;
-            let read = self.e.access.variant(value, union, i)?;
+            let read = self.e.std.read_variant(value, union, i);
             let _ = writeln!(out, "if let Some({held}) = {read} {{ {body}}}");
         }
         Ok(out)

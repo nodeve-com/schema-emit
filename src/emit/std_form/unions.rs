@@ -122,7 +122,7 @@ impl StdForm<'_> {
     }
 
     /// `Option<&M>`: the variant `index` of `value`, a `&` of the enum or of a box of it.
-    pub(super) fn read_variant(&self, value: &str, union: &Union, index: usize) -> String {
+    pub(crate) fn read_variant(&self, value: &str, union: &Union, index: usize) -> String {
         let name = self.union_name(union);
         let variant = self.variant_name(union, index);
         format!(

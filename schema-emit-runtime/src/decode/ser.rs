@@ -10,7 +10,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use base64::Engine as _;
-use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use serde::ser::{Serialize, SerializeTuple, Serializer};
 
 use super::Unfit;
@@ -52,7 +52,7 @@ impl Write<DateTime<Utc>> for Stamp {
         if !s.is_human_readable() {
             return (v.timestamp(), v.timestamp_subsec_nanos()).serialize(s);
         }
-        s.serialize_str(&v.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+        s.serialize_str(&any_value::timestamp_text(*v))
     }
 }
 
@@ -64,17 +64,7 @@ impl Write<TimeDelta> for Span {
         if !s.is_human_readable() {
             return v.serialize(s);
         }
-        let (secs, frac) = (v.num_seconds(), v.subsec_nanos());
-        let sign = if secs < 0 || frac < 0 { "-" } else { "" };
-        let text = match frac {
-            0 => std::format!("{sign}{}s", secs.unsigned_abs()),
-            _ => {
-                let digits = std::format!("{:09}", frac.unsigned_abs());
-                let digits = digits.trim_end_matches('0');
-                std::format!("{sign}{}.{digits}s", secs.unsigned_abs())
-            }
-        };
-        s.serialize_str(&text)
+        s.serialize_str(&any_value::duration_text(*v))
     }
 }
 
@@ -115,8 +105,8 @@ impl<T, W: Write<T>> Write<Vec<(String, T)>> for Entries<W> {
 /// A value of any kind: as it is, else as the text of its JSON.
 pub struct Dynamic;
 
-impl Write<serde_json::Value> for Dynamic {
-    fn write<S: Serializer>(&self, v: &serde_json::Value, s: S) -> Result<S::Ok, S::Error> {
+impl Write<any_value::Value> for Dynamic {
+    fn write<S: Serializer>(&self, v: &any_value::Value, s: S) -> Result<S::Ok, S::Error> {
         match s.is_human_readable() {
             true => v.serialize(s),
             false => match serde_json::to_string(v) {

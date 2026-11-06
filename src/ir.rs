@@ -79,8 +79,7 @@ pub enum Base {
     Text,
     /// Text of format `date-time`: an instant, which the embedder types as its timestamp.
     Timestamp,
-    /// Text of format `human-duration`: an optional sign, then humantime's text such as `1.5s` or
-    /// `90m`, which the embedder types as its duration.
+    /// Text of format `human-duration`, which the embedder types as its duration.
     Duration,
     /// Text of `contentEncoding: base64`, the embedder's bytes.
     Bytes,

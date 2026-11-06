@@ -6,7 +6,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use base64::Engine as _;
-use chrono::{DateTime, TimeDelta, Timelike, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use serde::de::{self, Deserialize, Deserializer};
 
 use super::{binary, Kinds, Shape, Unfit};
@@ -33,15 +33,15 @@ impl<'de> Kinds<'de> for Bool {
 pub struct Null;
 
 impl<'de> Kinds<'de> for Null {
-    type Value = ();
+    type Value = any_value::Null;
     const EXPECTED: &'static str = "null";
 
-    fn binary<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
-        <()>::deserialize(d)
+    fn binary<D: Deserializer<'de>>(self, d: D) -> Result<any_value::Null, D::Error> {
+        <()>::deserialize(d).map(|()| any_value::Null)
     }
 
-    fn null<E: de::Error>(self) -> Result<(), E> {
-        Ok(())
+    fn null<E: de::Error>(self) -> Result<any_value::Null, E> {
+        Ok(any_value::Null)
     }
 }
 
@@ -62,8 +62,7 @@ impl<'de> Kinds<'de> for Text {
     }
 }
 
-/// RFC 3339 `date-time`, at UTC. A leap second reads as the next second, and a `:60` outside
-/// 23:59 UTC fails.
+/// RFC 3339 `date-time`, at UTC, as `any_value::parse_timestamp` reads it.
 #[derive(Clone, Copy)]
 pub struct Timestamp;
 
@@ -78,16 +77,16 @@ impl<'de> Kinds<'de> for Timestamp {
     }
 
     fn text<E: de::Error>(self, v: &str) -> Result<DateTime<Utc>, E> {
-        let at = DateTime::parse_from_rfc3339(v)
-            .map_err(|_| Self::wrong::<E>())?
-            .with_timezone(&Utc);
-        let (seconds, nanos) = (at.timestamp(), at.timestamp_subsec_nanos());
-        let (seconds, nanos) = match nanos.checked_sub(1_000_000_000) {
-            Some(past) if (at.hour(), at.minute()) == (23, 59) => (seconds.saturating_add(1), past),
-            Some(_) => return Err(Self::wrong()),
-            None => (seconds, nanos),
-        };
-        DateTime::from_timestamp(seconds, nanos).ok_or_else(past_range)
+        any_value::parse_timestamp(v).map_err(|e| time_error(e, Self::wrong::<E>))
+    }
+}
+
+/// The failure of text that any-value's reader refused: `wrong` where it is no instant or span,
+/// else the range.
+fn time_error<E: de::Error>(e: any_value::Error, wrong: fn() -> E) -> E {
+    match e {
+        any_value::Error::Range => past_range(),
+        _ => wrong(),
     }
 }
 
@@ -96,8 +95,7 @@ fn past_range<E: de::Error>() -> E {
     Unfit::range("an instant or span past the range").raise()
 }
 
-/// A duration, `format: human-duration`: an optional sign, then `humantime`'s text (`1.5s`,
-/// `90m`).
+/// A duration, `format: human-duration`, as `any_value::parse_duration` reads it.
 #[derive(Clone, Copy)]
 pub struct Duration;
 
@@ -110,20 +108,8 @@ impl<'de> Kinds<'de> for Duration {
         TimeDelta::deserialize(d)
     }
 
-    #[allow(clippy::disallowed_methods)]
     fn text<E: de::Error>(self, v: &str) -> Result<TimeDelta, E> {
-        let (negative, unsigned) = match v.as_bytes().first() {
-            Some(b'-') => (true, v.get(1..).unwrap_or_default()),
-            Some(b'+') => (false, v.get(1..).unwrap_or_default()),
-            _ => (false, v),
-        };
-        let span = humantime::parse_duration(unsigned).map_err(|_| Self::wrong::<E>())?;
-        let delta = TimeDelta::from_std(span).map_err(|_| past_range::<E>())?;
-        let signed = match negative {
-            true => TimeDelta::zero().checked_sub(&delta),
-            false => Some(delta),
-        };
-        signed.ok_or_else(past_range)
+        any_value::parse_duration(v).map_err(|e| time_error(e, Self::wrong::<E>))
     }
 }
 

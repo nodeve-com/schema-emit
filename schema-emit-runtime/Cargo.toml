@@ -18,7 +18,7 @@ too_many_lines = "warn"
 
 [features]
 # Decoding into the std form and encoding it: the one part that needs an allocator.
-decode = ["dep:serde", "dep:serde_json", "dep:chrono", "dep:humantime", "dep:base64"]
+decode = ["dep:serde", "dep:serde_json", "dep:chrono", "dep:base64", "dep:any-value"]
 
 [dependencies]
 # Search only: a pattern check walks a table that schema-emit built.
@@ -26,11 +26,11 @@ pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "1aca
 # The emitted `Deserialize` impls are serde's; serde_json reads the text, and hands a union's value over as a slice.
 serde = { version = "1", optional = true }
 serde_json = { version = "1", features = ["preserve_order", "raw_value"], optional = true }
-# The reader of `human-duration` text: an optional sign, then humantime's text.
-humantime = { version = "2", optional = true }
 # A std value of a timestamp or a duration is a chrono type.
 chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"], optional = true }
 base64 = { version = "0.22", features = ["std"], optional = true }
+# A std value of any kind is its `Value`, and a null its `Null`.
+any-value = { path = "../../any-value", optional = true }
 
 [dev-dependencies]
 # A binary format, to test that one impl reads it.

@@ -1,6 +1,6 @@
 //! What the decode code that schema-emit writes links (feature `decode`). Each model gets a serde
 //! `Deserialize` impl, written out by the emitter; it reads a field's value through a seed built
-//! from the parts here, and builds no `serde_json::Value`. One impl reads JSON text, a parsed
+//! from the parts here, and builds no document. One impl reads JSON text, a parsed
 //! `serde_json::Value`, and any other self-describing format.
 //!
 //! - [`Kinds`] and [`Shape`] read a value by its JSON kind; `scalars` and `numbers` hold those of

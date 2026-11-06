@@ -12,7 +12,7 @@ impl StdForm<'_> {
     }
 
     /// Whether every field of model `m` has a default: an optional or nullable one always does,
-    /// as does a required one of a type that does. A union has none, nor has a model written
+    /// as does a required one of a type that does. A union and a value of any kind have none, nor has a model written
     /// elsewhere or one that holds itself.
     pub(super) fn defaults(&self, m: usize, seen: &mut Vec<usize>) -> bool {
         if seen.contains(&m) || (self.external)(m).is_some() {
@@ -24,7 +24,7 @@ impl StdForm<'_> {
             f.ty.nullable
                 || !f.required
                 || match &f.ty.base {
-                    Base::Union(_) => false,
+                    Base::Union(_) | Base::Any => false,
                     Base::Model(n) => self.defaults(*n, seen),
                     _ => true,
                 }

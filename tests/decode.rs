@@ -15,6 +15,8 @@ mod reserved;
 mod run;
 #[path = "decode/strip.rs"]
 mod strip;
+#[path = "decode/values.rs"]
+mod values;
 
 use schema_emit::emit::std_form::{names, StdForm};
 use schema_emit::json_schema::lower;
@@ -199,6 +201,8 @@ fn the_decode_and_the_encode_follow_their_rules() {
         ("strip", strip::schema(), strip::CHECK),
         ("reserved", reserved::schema(), reserved::CHECK),
         ("alias", reserved::alias(), reserved::ALIAS),
+        ("list", values::list(), values::LIST),
+        ("map", values::map(), values::MAP),
     ];
     for (name, schema, check) in &modules {
         main.push_str(&module(

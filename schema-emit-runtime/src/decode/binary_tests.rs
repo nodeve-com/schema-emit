@@ -5,7 +5,6 @@ use std::vec;
 use std::vec::Vec;
 
 use chrono::{DateTime, TimeDelta};
-use serde_json::json;
 
 use super::ser::{Dynamic, With};
 use super::tests::read;
@@ -61,10 +60,14 @@ fn time_and_bytes_are_numbers_and_raw_bytes() {
 
 #[test]
 fn a_value_of_any_kind_is_the_text_of_its_json_in_binary() {
-    let v = json!({ "k": [1, null] });
+    use any_value::Value;
+    let v = Value::Map(vec![(
+        "k".into(),
+        Value::List(vec![Value::Int(1), Value::Null]),
+    )]);
     let bytes = enc(&With(&v, Dynamic));
     assert_eq!(bin(&bytes, any()), Ok(v.clone()));
-    assert_eq!(read(&v.to_string(), any()), Ok(v));
+    assert_eq!(read(r#"{"k":[1,null]}"#, any()), Ok(v));
 }
 
 #[test]

@@ -106,7 +106,7 @@ fn a_value_read_without_a_decode_notes_nothing() {
 #[derive(Debug, PartialEq)]
 enum Either {
     Strict(Pair),
-    Loose(Value),
+    Loose(any_value::Value),
 }
 
 impl<'de> Deserialize<'de> for Either {

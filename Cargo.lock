@@ -42,6 +42,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
 
 [[package]]
+name = "any-value"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "humantime",
+ "serde",
+]
+
+[[package]]
 name = "arraydeque"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -344,9 +353,9 @@ dependencies = [
 name = "schema-emit-runtime"
 version = "0.6.2"
 dependencies = [
+ "any-value",
  "base64",
  "chrono",
- "humantime",
  "pattern-emit",
  "postcard",
  "serde",

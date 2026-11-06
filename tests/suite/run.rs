@@ -38,7 +38,7 @@ pub fn name(i: usize) -> String {
 /// Each case's module, or why it doesn't emit.
 pub fn module(n: usize, case: &Case) -> Result<String, Error> {
     let std = StdForm::new(&case.schema, &name);
-    let check = Emitter::new(&case.schema, &std).check(case.model, "check")?;
+    let check = Emitter::new(&std).check(case.model, "check")?;
     Ok(format!(
         "mod c{n} {{ #![allow(unused_imports, clippy::all)] use ::schema_emit_runtime as __s;\n{}{check}\
          pub fn run() -> super::Outcome {{ \
@@ -104,11 +104,13 @@ fn write_project(dir: &Path, name: &str, main: &str) {
         format!(
             "[package]\nname = \"{name}\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\
              [dependencies]\nschema-emit-runtime = {{ path = {:?}, features = [\"decode\"] }}\n\
+             any-value = {{ path = {:?} }}\n\
              serde_json = {{ version = \"1\", features = [\"float_roundtrip\"] }}\n\
              postcard = {{ version = \"1\", default-features = false, features = [\"alloc\"] }}\n\
              chrono = {{ version = \"0.4\", default-features = false }}\n[workspace]\n\
              [profile.dev]\ndebug = false\n",
-            runtime.display().to_string()
+            runtime.display().to_string(),
+            runtime.join("../../any-value").display().to_string()
         ),
     )
     .unwrap();

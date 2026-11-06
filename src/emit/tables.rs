@@ -4,15 +4,17 @@
 use std::cell::{Cell, RefCell};
 use std::fmt::Write as _;
 
-use super::{unions, Access, Emitter, Walk, STD};
-use crate::ir::{Schema, Ty, Union};
+use super::std_form::StdForm;
+use super::{unions, Emitter, Walk, STD};
+use crate::ir::{Ty, Union};
 use crate::Error;
 
 impl<'a> Emitter<'a> {
-    pub fn new(schema: &'a Schema, access: &'a dyn Access) -> Self {
+    /// An emitter of checks over the models of `std`, reading the types it writes.
+    pub fn new(std: &'a StdForm<'a>) -> Self {
         Emitter {
-            schema,
-            access,
+            schema: std.schema,
+            std,
             tables: RefCell::default(),
             root: Cell::default(),
             extra: RefCell::default(),
@@ -54,7 +56,7 @@ impl<'a> Emitter<'a> {
 
     /// `pub fn <name>`, checking a `&` of a value of `ty`, its failures' paths from `path`.
     pub(super) fn function(&self, name: &str, path: &str, ty: &Ty) -> Result<String, Error> {
-        let rust = self.access.rust(self.schema, &Ty::of(ty.base.clone()))?;
+        let rust = self.std.rust(&Ty::of(ty.base.clone()));
         let body = Walk::new(self, path).present("v", ty)?;
         Ok(format!(
             "#[allow(unused_variables, unused_mut, unused_parens, unreachable_patterns, clippy::all)]\n\

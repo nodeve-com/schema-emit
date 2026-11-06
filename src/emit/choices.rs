@@ -62,7 +62,7 @@ impl Walk<'_, '_> {
                 let t = self.at.local("s");
                 format!(
                     "match {} {{ Ok({t}) => {t} == {s:?}, Err(_) => false }}",
-                    e.access.text(v)
+                    e.std.text(v)
                 )
             }
             (Base::List(item), Lit::List(xs)) => self.eq_items(v, item, xs)?,
@@ -94,13 +94,13 @@ impl Walk<'_, '_> {
         match (&ty.base, lit) {
             (Base::Tuple { prefix, .. }, Lit::List(xs)) => {
                 for (i, p) in prefix.iter().enumerate() {
-                    slots.push((e.access.element(v, i), p, xs.get(i)));
+                    slots.push((e.std.element(v, i), p, xs.get(i)));
                 }
             }
             (Base::Model(m), Lit::Object(kv)) => {
                 for (i, f) in e.model(*m)?.fields.iter().enumerate() {
                     let found = kv.iter().find(|(k, _)| *k == f.name).map(|(_, l)| l);
-                    slots.push((e.access.field(v, *m, i), &f.ty, found));
+                    slots.push((e.std.field(v, *m, i), &f.ty, found));
                 }
             }
             _ => return Err(Error::invalid(format!("a choice {lit:?} of {:?}", ty.base))),
@@ -110,7 +110,7 @@ impl Walk<'_, '_> {
 
     /// `v`, a `&` of a list of `item`, equal to the list literal `xs` item by item.
     fn eq_items(&mut self, v: &str, item: &Ty, xs: &[Lit]) -> Result<String, Error> {
-        let (it, rust) = (self.at.local("l"), self.e.access.rust(self.e.schema, item)?);
+        let (it, rust) = (self.at.local("l"), self.e.std.rust(item));
         let mut conds = Vec::new();
         for lit in xs {
             let x = self.at.local("x");
@@ -124,7 +124,7 @@ impl Walk<'_, '_> {
         conds.push(format!("{it}.next().is_none()"));
         Ok(format!(
             "match {} {{ Ok(mut {it}) => {}, Err(_) => false }}",
-            self.e.access.items(v),
+            self.e.std.iter(v),
             conds.join(" && ")
         ))
     }

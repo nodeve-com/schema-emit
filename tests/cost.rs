@@ -30,6 +30,7 @@ const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixture/cost"
 const MANIFEST: &str = "[package]\nname = \"schema-emit-cost\"\nversion = \"0.0.0\"\n\
     edition = \"2021\"\n[workspace]\n[dependencies]\n\
     schema-emit-runtime = { path = RUNTIME, features = [\"decode\"] }\n\
+    any-value = { path = ANYVALUE }\n\
     serde = { version = \"1\", features = [\"derive\"] }\n\
     serde_json = { version = \"1\", features = [\"float_roundtrip\"] }\n\
     chrono = { version = \"0.4\", default-features = false, features = [\"serde\"] }\n\
@@ -126,7 +127,13 @@ fn build(cases: &[Case]) -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("schema-emit-cost");
     std::fs::create_dir_all(dir.join("src")).unwrap();
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("schema-emit-runtime");
-    let manifest = MANIFEST.replace("RUNTIME", &format!("{:?}", runtime.display().to_string()));
+    let any = format!(
+        "{:?}",
+        runtime.join("../../any-value").display().to_string()
+    );
+    let manifest = MANIFEST
+        .replace("RUNTIME", &format!("{:?}", runtime.display().to_string()))
+        .replace("ANYVALUE", &any);
     std::fs::write(dir.join("Cargo.toml"), manifest).unwrap();
     std::fs::copy(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock"),

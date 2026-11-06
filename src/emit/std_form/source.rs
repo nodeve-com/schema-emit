@@ -18,7 +18,7 @@ pub fn source(
     let std = StdForm::new(schema, &name).with_external(&theirs);
     let mut out = std.items()?;
     for (model, check) in checks {
-        out.push_str(&Emitter::new(schema, &std).check(*model, check)?);
+        out.push_str(&Emitter::new(&std).check(*model, check)?);
     }
     Ok(out)
 }

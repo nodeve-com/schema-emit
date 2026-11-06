@@ -1,13 +1,10 @@
 //! Area: keys no field names. A model holding [`Model::others`] is read through
-//! [`Access::others`] and [`Access::other`]: every other key and its value, or the value under
+//! `StdForm::others` and `StdForm::other`: every other key and its value, or the value under
 //! one key. A key is a field's name, else an other key; a name neither holds is never present.
 //!
 //! A key's value fails at the model's path plus `.*`, since a path is a literal. `Present` fails
 //! `absent` at the key's own path. A rule on a key's name, `Matching` and `Unmatched` by pattern
 //! and `Names` by its text checks, reads the key as a `&str`.
-//!
-//! [`Access::others`]: super::Access::others
-//! [`Access::other`]: super::Access::other
 
 use std::fmt::Write as _;
 
@@ -20,10 +17,10 @@ impl Emitter<'_> {
     pub(super) fn entry(&self, value: &str, model: usize, name: &str) -> Result<String, Error> {
         let m = self.model(model)?;
         if let Some(i) = m.fields.iter().position(|f| f.name == name) {
-            return Ok(self.access.field(value, model, i));
+            return Ok(self.std.field(value, model, i));
         }
         match m.others {
-            Some(_) => self.access.other(value, model, &format!("{name:?}")),
+            Some(_) => self.std.other(value, model, &format!("{name:?}")),
             None => Ok("None::<&()>".into()),
         }
     }
@@ -41,11 +38,11 @@ impl Walk<'_, '_> {
         match check {
             Check::Present(names) => self.keys_present(value, model, names),
             Check::Matching { pattern, ty } => {
-                let entries = e.access.others(value, model)?;
+                let entries = e.std.others(value, model)?;
                 self.each(&entries, |k| pattern_cond(e, pattern, k), ty)
             }
             Check::Unmatched { patterns, ty } => {
-                let entries = e.access.others(value, model)?;
+                let entries = e.std.others(value, model)?;
                 self.each(&entries, |k| unmatched_cond(e, patterns, k), ty)
             }
             Check::Names(ty) => self.key_names(value, model, ty),
@@ -94,7 +91,7 @@ impl Walk<'_, '_> {
             let _ = writeln!(
                 out,
                 "if ({}).is_some() {{ let {k}: &str = {:?};\n{}}}",
-                e.access.field(value, model, i),
+                e.std.field(value, model, i),
                 f.name,
                 guard(&self.at, &conds)
             );
@@ -103,7 +100,7 @@ impl Walk<'_, '_> {
             let _ = writeln!(
                 out,
                 "for ({k}, _) in {} {{\n{}}}",
-                e.access.others(value, model)?,
+                e.std.others(value, model)?,
                 guard(&self.at, &conds)
             );
         }

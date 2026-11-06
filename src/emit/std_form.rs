@@ -2,8 +2,7 @@
 
 use std::fmt::Write as _;
 
-use super::Access;
-use crate::ir::{Additional, Base, Float, Model, Schema, Ty, Union};
+use crate::ir::{Additional, Base, Float, Model, Schema, Ty};
 use crate::Error;
 
 mod decode;
@@ -11,6 +10,7 @@ mod derives;
 mod encode;
 mod idents;
 mod paths;
+mod read;
 mod source;
 mod types;
 mod unions;
@@ -35,46 +35,6 @@ pub struct StdForm<'a> {
 /// No model written elsewhere.
 fn local(_: usize) -> Option<String> {
     None
-}
-
-impl Access for StdForm<'_> {
-    fn rust(&self, _: &Schema, ty: &Ty) -> Result<String, Error> {
-        Ok(self.ty(ty, None))
-    }
-
-    fn field(&self, value: &str, model: usize, field: usize) -> String {
-        let name = self.schema.models.get(model).and_then(|m| {
-            let f = m.fields.get(field)?;
-            Some((idents::of(m).fields.get(field)?.clone(), f.required))
-        });
-        match name {
-            Some((name, true)) => format!("Some(&{value}.{name})"),
-            Some((name, false)) => format!("{value}.{name}.as_ref()"),
-            None => "None".into(),
-        }
-    }
-
-    fn others(&self, value: &str, model: usize) -> Result<String, Error> {
-        let field = self.others_field(model)?;
-        Ok(format!(
-            "{value}.{field}.iter().map(|(k, x)| (k.as_str(), x))"
-        ))
-    }
-
-    fn entries(&self, value: &str) -> Result<String, Error> {
-        Ok(format!("{value}.iter().map(|(k, x)| (k.as_str(), x))"))
-    }
-
-    fn variant(&self, value: &str, union: &Union, index: usize) -> Result<String, Error> {
-        Ok(self.read_variant(value, union, index))
-    }
-
-    fn other(&self, value: &str, model: usize, key: &str) -> Result<String, Error> {
-        let field = self.others_field(model)?;
-        Ok(format!(
-            "{value}.{field}.iter().find(|(k, _)| k.as_str() == {key}).map(|(_, x)| x)"
-        ))
-    }
 }
 
 /// A struct name for each of `schema`'s models: its name in upper camel case, made unique, for
@@ -118,8 +78,8 @@ impl<'a> StdForm<'a> {
     /// that holds `owner`.
     fn ty(&self, ty: &Ty, owner: Option<usize>) -> String {
         let base = match &ty.base {
-            Base::Null => "()".into(),
-            Base::Any => "::serde_json::Value".into(),
+            Base::Null => "::any_value::Null".into(),
+            Base::Any => "::any_value::Value".into(),
             Base::Bool => "bool".into(),
             Base::Int(w) => rust_int(*w).into(),
             Base::Float(Float::F32) => "f32".into(),
@@ -213,11 +173,21 @@ impl<'a> StdForm<'a> {
         self.structs()
     }
 
-    /// Each model's struct, after the enums of the unions they hold.
+    /// Each model's struct, or alias where it is a value's own type, after the enums of the unions
+    /// they hold.
     fn structs(&self) -> String {
         let mut out = self.union_items();
         for (i, m) in self.schema.models.iter().enumerate() {
             if (self.external)(i).is_some() {
+                continue;
+            }
+            if let (true, Some(f)) = (self.is_alias(i), m.fields.first()) {
+                let _ = writeln!(
+                    out,
+                    "#[allow(dead_code)] pub type {} = {};",
+                    self.model_name(i),
+                    self.ty(&f.ty, None)
+                );
                 continue;
             }
             let _ = writeln!(
