@@ -8,6 +8,8 @@
 
 #[path = "decode/binary.rs"]
 mod binary;
+#[path = "program/manifest.rs"]
+mod manifest;
 #[path = "decode/reserved.rs"]
 mod reserved;
 #[allow(dead_code)]

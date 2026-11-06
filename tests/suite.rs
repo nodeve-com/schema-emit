@@ -17,6 +17,8 @@
 mod files;
 #[path = "suite/judge.rs"]
 mod judge;
+#[path = "program/manifest.rs"]
+mod manifest;
 #[path = "suite/run.rs"]
 mod run;
 #[path = "suite/typed.rs"]

@@ -104,13 +104,13 @@ fn write_project(dir: &Path, name: &str, main: &str) {
         format!(
             "[package]\nname = \"{name}\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\
              [dependencies]\nschema-emit-runtime = {{ path = {:?}, features = [\"decode\"] }}\n\
-             any-value = {{ path = {:?} }}\n\
+             any-value = {}\n\
              serde_json = {{ version = \"1\", features = [\"float_roundtrip\"] }}\n\
              postcard = {{ version = \"1\", default-features = false, features = [\"alloc\"] }}\n\
              chrono = {{ version = \"0.4\", default-features = false }}\n[workspace]\n\
              [profile.dev]\ndebug = false\n",
             runtime.display().to_string(),
-            runtime.join("../../any-value").display().to_string()
+            crate::manifest::any_value_dep()
         ),
     )
     .unwrap();
