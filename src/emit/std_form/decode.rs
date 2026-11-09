@@ -17,7 +17,7 @@
 use std::fmt::Write as _;
 
 use super::{idents, StdForm};
-use crate::ir::{Additional, Base, Float, Lit, Model, Ty};
+use crate::ir::{Additional, Model, Ty};
 use crate::Error;
 
 mod binary;
@@ -214,11 +214,12 @@ impl StdForm<'_> {
                     "{parts}::require::<_, __A::Error>(&f{k}, {step:?})?; "
                 );
                 let _ = write!(out.init, "{n}: f{k}?, ");
-            } else if let Some(lit) = &f.ty.default {
+            } else if f.ty.default.is_some() {
                 let _ = write!(
                     out.init,
-                    "{n}: f{k}.unwrap_or_else(|| {}), ",
-                    literal(&f.ty, lit)
+                    "{n}: f{k}.unwrap_or_else({}::{}), ",
+                    self.model_name(i),
+                    super::defaults::field_fn(n)
                 );
             } else {
                 let _ = write!(out.init, "{n}: f{k}, ");
@@ -269,17 +270,5 @@ impl StdForm<'_> {
                 ..Unnamed::default()
             },
         }
-    }
-}
-
-/// A default's Rust value, of `ty`'s std type.
-fn literal(ty: &Ty, lit: &Lit) -> String {
-    match (&ty.base, lit) {
-        (Base::Float(Float::F32), Lit::Float(f)) => format!("{:?}f32", *f as f32),
-        (_, Lit::Float(f)) => format!("{f:?}f64"),
-        (_, Lit::Int(i)) => i.to_string(),
-        (_, Lit::Bool(b)) => b.to_string(),
-        (_, Lit::Text(s)) => format!("::std::string::String::from({s:?})"),
-        _ => "::core::default::Default::default()".into(),
     }
 }

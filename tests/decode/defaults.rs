@@ -1,4 +1,5 @@
-//! `default`: a field takes it where its key is absent or its value is skipped.
+//! `default`: a field takes it where its key is absent or its value is skipped, and each
+//! default is a function returning it.
 
 use serde_json::{json, Value};
 
@@ -27,8 +28,20 @@ pub const CHECK: &str = r##"
     assert_eq!(given, Root { id: 1, on: false, n: 4, f: 0.25, w: -1.0, t: "a".into() });
     assert_eq!(v(r#"{"id":1,"n":"x"}"#).n, -3);
     assert_eq!(s(r#"{"id":1,"n":"x"}"#), ["Root.n: expected an integer"]);
+    assert_eq!((Root::default_n(), Root::default_t()), (-3, "say \"hi\" é".to_string()));
     assert_eq!(d(&out(&filled)).unwrap(), filled);
     assert!(out(&filled).contains(r#""on":true"#));
     let bytes = ::postcard::to_allocvec(&given).unwrap();
     assert_eq!(::postcard::from_bytes::<Root>(&bytes).unwrap(), given);
+"##;
+
+/// A root number with a default.
+pub fn root() -> Value {
+    json!({ "type": "number", "format": "float", "default": 2.5 })
+}
+
+/// The root's default is `default_root()`.
+pub const ROOT: &str = r##"
+    assert_eq!(default_root(), 2.5f32);
+    assert_eq!(v("1"), 1.0);
 "##;

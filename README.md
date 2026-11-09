@@ -6,7 +6,7 @@ A **schema** describes what valid data looks like: which fields it has and which
 - **Extra keys dropped, kept, or refused.** `x-strip-additional: true` drops keys no field names ([`emit::std_form`] § Extra keys lists all three).
 - **Models written elsewhere.** You can say another module holds a model ([`emit::std_form::StdForm::with_external`]).
 - **Common value types.** Timestamps and durations are `chrono`'s. `format: human-duration` is a duration. Their text forms are [any-value's](https://github.com/nodeve-com/any-value#timestamps-and-durations-as-text).
-- **Defaults.** A property's `default` fills its field when the key is absent ([`emit::std_form`] § Defaults).
+- **Defaults.** Each `default` is a function returning it, a property's or a root's; the decode calls a property's when its key is absent ([`emit::std_form`] § Defaults).
 - **Annotations you name.** A keyword such as a unit rides along when you ask for it. schema-emit refuses any other.
 
 Anything else on a type, such as how it crosses a boundary or its storage, you write beside the type. The generated code uses schema-emit-runtime.

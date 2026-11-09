@@ -6,6 +6,7 @@ use crate::ir::{Additional, Base, Float, Model, Schema, Ty};
 use crate::Error;
 
 mod decode;
+mod defaults;
 mod derives;
 mod encode;
 mod idents;
@@ -159,11 +160,13 @@ impl<'a> StdForm<'a> {
         Ok(idents::of(m.ok_or_else(|| Error::invalid(format!("no model {model}")))?).others)
     }
 
-    /// Each model's struct, and the code decoding a value into it and encoding it.
+    /// Each model's struct, and the code decoding a value into it, encoding it, and giving its
+    /// defaults.
     pub fn items(&self) -> Result<String, Error> {
         let mut out = self.structs();
         out.push_str(&self.decoders()?);
         out.push_str(&self.encoders());
+        out.push_str(&self.default_fns());
         Ok(out)
     }
 

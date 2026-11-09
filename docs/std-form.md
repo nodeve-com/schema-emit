@@ -7,7 +7,7 @@ The standard form: values as standard Rust, for use anywhere. A struct per objec
 - A model whose root is no object, such as one number or a list, is its value's own Rust type, named by an alias: an `int8` root is `i8`. One that holds itself through a `$ref` is a struct of one field instead, as Rust has no alias of itself.
 - A union is an enum, a variant per branch, named by its `$defs` key, else its branches' types joined by `Or`.
 
-[`emit::Emitter`](super::Emitter) writes its checks over these types, taking a [`StdForm`]. Beside each struct it writes a serde `Deserialize` and `Serialize` impl and the function `decode_<name>` (snake case, same rule). An alias has no impl, as Rust allows none on `i8` or `Vec`, so it gets `decode_<name>` and `encode_<name>(&value, serializer)`.
+[`emit::Emitter`](super::Emitter) writes its checks over these types, taking a [`StdForm`]. Beside each struct it writes a serde `Deserialize` and `Serialize` impl and the function `decode_<name>` (snake case, same rule). An alias has no impl, as Rust allows none on `i8` or `Vec`, so it gets `decode_<name>` and `encode_<name>(&value, serializer)`, and `default_<name>()` where its root has a [default](#defaults).
 
 ## Extra keys
 
@@ -19,7 +19,7 @@ A key no field names, in a model's input:
 
 ## Defaults
 
-A property's `default` is the value its field takes when the decode finds no value for it: the key is absent, or its value is bad and skipped. The value always holds the field, so the field's checks and the model's counts of keys present read it as present, and `Serialize` writes it.
+Each `default` is a function returning it: `<Model>::default_<field>()` for a property's, and `default_<name>()` (the same name rule as `decode_<name>`) for an alias model's root. Anything needing a value it has none of calls it. The decode does so when it finds no value for a field: the key is absent, or its value is bad and skipped. A defaulted field always holds a value, so the field's checks and the model's counts of keys present read it as present, and `Serialize` writes it.
 
 A default is a boolean, a number, or plain text. Lowering judges it by its type, and refuses one of another kind, past the number's width, or failing the type's checks. [Missing](missing.md#smaller-gaps) has the defaults schema-emit can't hold. A struct holding a default derives no `Default`, since Rust's would differ from it.
 

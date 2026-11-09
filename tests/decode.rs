@@ -208,6 +208,7 @@ fn the_decode_and_the_encode_follow_their_rules() {
         ("list", values::list(), values::LIST),
         ("map", values::map(), values::MAP),
         ("defaults", defaults::schema(), defaults::CHECK),
+        ("root_default", defaults::root(), defaults::ROOT),
     ];
     for (name, schema, check) in &modules {
         main.push_str(&module(
