@@ -112,11 +112,20 @@ pub(in crate::json_schema) fn ty_meet(name: &str, ty: &mut Ty, st: Ty) -> Result
     absorb(name, ty, st)
 }
 
-/// Adds `st`'s checks to `ty`, and its notes where they agree. A value is nullable only where
-/// both admit null.
+/// Adds `st`'s checks to `ty`, and its notes and default where they agree. A value is nullable
+/// only where both admit null.
 pub(super) fn absorb(name: &str, ty: &mut Ty, st: Ty) -> Result<(), Error> {
     ty.nullable &= st.nullable;
     ty.checks.extend(st.checks);
+    match (&ty.default, st.default) {
+        (Some(m), Some(t)) if *m != t => {
+            return Err(Error::unsupported(format!(
+                "{name}: `allOf` gives `default` as {m:?} and {t:?}"
+            )));
+        }
+        (_, Some(t)) => ty.default = Some(t),
+        _ => {}
+    }
     for (what, theirs) in st.notes.0 {
         agree(name, &what, &mut ty.notes.0, theirs)?;
     }

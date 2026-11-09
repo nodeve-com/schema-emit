@@ -27,4 +27,5 @@ What depends on which subschema passed: `unevaluatedProperties` beside a branch 
 - **`pattern`**: refused where pattern-emit's ECMA-262 guard refuses or its table passes the cap: lookaround, backreferences, inline flags, `\p` beyond a general category by short name, and Unicode classes wider than a few thousand characters (`\p{L}`).
 - **Branches**: `items`, `prefixItems`, or `additionalProperties` in an untyped branch over a list or map.
 - **Unknown keywords**: 2020-12 ignores a keyword it doesn't know. schema-emit refuses any it wasn't asked to carry.
+- **Defaults**: a `default` of a list, an object, a timestamp, a duration, bytes, or a nullable type, one on a schema with no `type`, one beside a recursive `$ref`, and one beside a check other than a choice, a bound, `multipleOf`, a length, or a pattern, which lowering can't judge it by.
 - **Arrays**: an array without `items`, `uniqueItems` of a tuple with trailing items, and `contains` of another type than `items`.

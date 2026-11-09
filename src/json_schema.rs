@@ -11,6 +11,7 @@ mod bounds;
 mod branches;
 mod choices;
 mod combine;
+mod defaults;
 mod defs;
 mod lists;
 mod models;
@@ -151,7 +152,7 @@ pub(crate) type Done = Option<Result<(), Error>>;
 type Keyword = fn(&mut Key) -> Done;
 
 /// Every area's, asked in turn.
-const AREAS: [Keyword; 12] = [
+const AREAS: [Keyword; 13] = [
     scalars::keyword,
     bounds::keyword,
     text::keyword,
@@ -163,6 +164,7 @@ const AREAS: [Keyword; 12] = [
     negate::keyword,
     branches::keyword,
     unevaluated::keyword,
+    defaults::keyword,
     notes::keyword,
 ];
 
@@ -262,6 +264,7 @@ impl Lower {
                 .unwrap_or_else(|| Err(Error::unsupported(format!("keyword `{key}`"))));
             done.map_err(|e| e.at(name))?;
         }
+        defaults::judge(&ty).map_err(|e| e.at(name))?;
         Ok(ty)
     }
 

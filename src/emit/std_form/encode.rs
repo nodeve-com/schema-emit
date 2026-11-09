@@ -75,7 +75,7 @@ impl StdForm<'_> {
         let names = idents::of(m);
         if m.is_value() {
             return match (m.fields.first(), names.fields.first()) {
-                (Some(f), Some(n)) if f.required => self.written(&format!("&self.{n}"), &f.ty),
+                (Some(f), Some(n)) if f.held() => self.written(&format!("&self.{n}"), &f.ty),
                 (Some(f), Some(n)) => format!(
                     "match &self.{n} {{ Some(v) => {}, None => s.serialize_none() }}",
                     self.written("v", &f.ty)
@@ -96,7 +96,7 @@ impl StdForm<'_> {
                     d("ser")
                 )
             };
-            match f.required {
+            match f.held() {
                 true => out.push_str(&entry(&format!("&self.{n}"))),
                 false => {
                     let _ = write!(out, "if let Some(v) = &self.{n} {{ {} }} ", entry("v"));
@@ -122,7 +122,7 @@ impl StdForm<'_> {
         );
         for (f, n) in m.fields.iter().zip(&names.fields) {
             let w = self.writer(&f.ty);
-            let w = if f.required {
+            let w = if f.held() {
                 w
             } else {
                 format!("{ser}::Maybe({w})")

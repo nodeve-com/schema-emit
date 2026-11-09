@@ -19,7 +19,7 @@ impl StdForm<'_> {
         }
         let name = self.schema.models.get(model).and_then(|m| {
             let f = m.fields.get(field)?;
-            Some((idents::of(m).fields.get(field)?.clone(), f.required))
+            Some((idents::of(m).fields.get(field)?.clone(), f.held()))
         });
         match name {
             Some((name, true)) => format!("Some(&{value}.{name})"),

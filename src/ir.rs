@@ -42,6 +42,13 @@ pub struct Field {
     pub required: bool,
 }
 
+impl Field {
+    /// Whether a value always holds this field: it is required, or its type has a default.
+    pub fn held(&self) -> bool {
+        self.required || self.ty.default.is_some()
+    }
+}
+
 /// A type: its base, the checks on a value of it, and what it carries beside the check.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ty {
@@ -52,6 +59,9 @@ pub struct Ty {
     pub nullable: bool,
     pub checks: Vec<Check>,
     pub notes: Notes,
+    /// The value a field of this type takes where its key is absent: a boolean, number, or
+    /// text of the base's kind, which the type's checks pass.
+    pub default: Option<Lit>,
 }
 
 impl Ty {
@@ -61,6 +71,7 @@ impl Ty {
             nullable: false,
             checks: Vec::new(),
             notes: Notes::default(),
+            default: None,
         }
     }
 }
@@ -145,50 +156,6 @@ pub enum Json {
     Text,
     Array,
     Object,
-}
-
-/// An integer's width, named as Rust and cel-emit name it: the std form's type, and the bound.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Int {
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-}
-
-impl Int {
-    /// Its least and greatest value; a check reads an `i128`, so `U128`'s greatest is `i128::MAX`.
-    pub fn bounds(self) -> (i128, i128) {
-        match self {
-            Int::I8 => (i8::MIN.into(), i8::MAX.into()),
-            Int::I16 => (i16::MIN.into(), i16::MAX.into()),
-            Int::I32 => (i32::MIN.into(), i32::MAX.into()),
-            Int::I64 => (i64::MIN.into(), i64::MAX.into()),
-            Int::I128 => (i128::MIN, i128::MAX),
-            Int::U8 => (0, u8::MAX.into()),
-            Int::U16 => (0, u16::MAX.into()),
-            Int::U32 => (0, u32::MAX.into()),
-            Int::U64 => (0, u64::MAX.into()),
-            Int::U128 => (0, i128::MAX),
-        }
-    }
-
-    pub fn signed(self) -> bool {
-        matches!(self, Int::I8 | Int::I16 | Int::I32 | Int::I64 | Int::I128)
-    }
-}
-
-/// A float's width: the check fails NaN, the infinities, and a value past the width's range.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Float {
-    F32,
-    F64,
 }
 
 /// A constraint on a value, beyond its base. Each is one area's (crate docs).
@@ -294,5 +261,7 @@ pub enum Count {
 }
 
 mod values;
+mod widths;
 
 pub use values::{Additional, Lit, Notes, Num};
+pub use widths::{Float, Int};

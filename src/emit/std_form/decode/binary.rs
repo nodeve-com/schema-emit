@@ -17,7 +17,7 @@ impl StdForm<'_> {
         let (mut reads, mut init) = (String::new(), String::new());
         for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
             let seed = self.seed(&f.ty, Some(i));
-            let seed = match f.required {
+            let seed = match f.held() {
                 true => seed,
                 false => optional(&seed),
             };

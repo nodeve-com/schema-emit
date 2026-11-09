@@ -1,8 +1,8 @@
 //! Area: annotations. A keyword the caller names carries its text beside the check in
 //! [`crate::ir::Notes`]; the emitter never reads it. This area is asked last, so naming a keyword
 //! another area owns, such as `minimum`, never drops its check. Keywords that only annotate
-//! (`title`, `description`, `$comment`, `$id`, `$anchor`, `default`, `examples`, `deprecated`,
-//! `readOnly`, `writeOnly`, and the content keywords `contentMediaType`, `contentEncoding`,
+//! (`title`, `description`, `$comment`, `$id`, `$anchor`, `examples`, `deprecated`, `readOnly`,
+//! `writeOnly`, and the content keywords `contentMediaType`, `contentEncoding`,
 //! `contentSchema`) check nothing, and carry when named. `$schema` checks nothing where it
 //! names the standard's 2020-12 metaschema: another might drop a vocabulary, whose keywords then
 //! check nothing, so it is unsupported. Any other keyword is unsupported.
@@ -23,9 +23,9 @@ pub(super) fn keyword(k: &mut Key) -> Done {
         return Some(Ok(()));
     }
     match k.key {
-        "title" | "description" | "$comment" | "default" | "examples" | "deprecated"
-        | "readOnly" | "writeOnly" | "contentMediaType" | "contentEncoding" | "contentSchema"
-        | "$id" | "$anchor" => Some(Ok(())),
+        "title" | "description" | "$comment" | "examples" | "deprecated" | "readOnly"
+        | "writeOnly" | "contentMediaType" | "contentEncoding" | "contentSchema" | "$id"
+        | "$anchor" => Some(Ok(())),
         _ => None,
     }
 }
@@ -35,11 +35,10 @@ pub(super) const METASCHEMA: &str = "https://json-schema.org/draft/2020-12/schem
 
 /// Keywords that name or note a schema and check nothing: a schema holding only these admits
 /// every value.
-const ANNOTATIONS: [&str; 12] = [
+const ANNOTATIONS: [&str; 11] = [
     "description",
     "title",
     "$comment",
-    "default",
     "examples",
     "deprecated",
     "readOnly",

@@ -11,8 +11,9 @@ impl StdForm<'_> {
         format!("#[derive(Debug, Clone, PartialEq{default}{extra})]")
     }
 
-    /// Whether every field of model `m` has a default: an optional or nullable one always does,
-    /// as does a required one of a type that does. A union and a value of any kind have none, nor has a model written
+    /// Whether every field of model `m` has a derived default: an optional or nullable one always
+    /// does, as does a required one of a type that does. One with a schema `default` has none, as
+    /// the derived one would differ. A union and a value of any kind have none, nor has a model written
     /// elsewhere or one that holds itself.
     pub(super) fn defaults(&self, m: usize, seen: &mut Vec<usize>) -> bool {
         if seen.contains(&m) || (self.external)(m).is_some() {
@@ -21,13 +22,14 @@ impl StdForm<'_> {
         seen.push(m);
         let fields = self.schema.models.get(m).map(|m| m.fields.as_slice());
         let ok = fields.unwrap_or_default().iter().all(|f| {
-            f.ty.nullable
-                || !f.required
-                || match &f.ty.base {
-                    Base::Union(_) | Base::Any => false,
-                    Base::Model(n) => self.defaults(*n, seen),
-                    _ => true,
-                }
+            f.ty.default.is_none()
+                && (f.ty.nullable
+                    || !f.required
+                    || match &f.ty.base {
+                        Base::Union(_) | Base::Any => false,
+                        Base::Model(n) => self.defaults(*n, seen),
+                        _ => true,
+                    })
         });
         seen.pop();
         ok

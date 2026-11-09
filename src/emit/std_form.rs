@@ -207,7 +207,7 @@ impl<'a> StdForm<'a> {
         let mut fields = String::new();
         for (f, name) in m.fields.iter().zip(&names.fields) {
             let ty = self.ty(&f.ty, Some(i));
-            let ty = if f.required {
+            let ty = if f.held() {
                 ty
             } else {
                 format!("::core::option::Option<{ty}>")

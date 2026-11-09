@@ -1,6 +1,6 @@
 //! The emitted decode and encode, end to end: schemas lowered and emitted into modules of one
 //! program that cargo builds once. The program's own assertions state each rule of the decode
-//! (every failing field named, unknown keys, widths, the union rule, one impl for text and a
+//! (every failing field named, unknown keys, widths, defaults, the union rule, one impl for text and a
 //! parsed value) and of the encode (what is written back, and round trips), and of the binary
 //! form (`decode/binary.rs`).
 
@@ -8,6 +8,8 @@
 
 #[path = "decode/binary.rs"]
 mod binary;
+#[path = "decode/defaults.rs"]
+mod defaults;
 #[path = "program/manifest.rs"]
 mod manifest;
 #[path = "decode/reserved.rs"]
@@ -205,6 +207,7 @@ fn the_decode_and_the_encode_follow_their_rules() {
         ("alias", reserved::alias(), reserved::ALIAS),
         ("list", values::list(), values::LIST),
         ("map", values::map(), values::MAP),
+        ("defaults", defaults::schema(), defaults::CHECK),
     ];
     for (name, schema, check) in &modules {
         main.push_str(&module(

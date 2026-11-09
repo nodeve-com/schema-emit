@@ -34,7 +34,7 @@ pub(super) fn keyword(k: &mut Key) -> Done {
 }
 
 /// `m` as a literal of `ty`, `None` where no value of `ty` equals it.
-fn member(schema: &Schema, ty: &Ty, m: &Value) -> Result<Option<Lit>, Error> {
+pub(super) fn member(schema: &Schema, ty: &Ty, m: &Value) -> Result<Option<Lit>, Error> {
     let base = &ty.base;
     Ok(match (base, m) {
         (_, Value::Null) if ty.nullable || *base == Base::Null => Some(Lit::Null),

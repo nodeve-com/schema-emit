@@ -134,7 +134,7 @@
         "schema": {
             "type": "object",
             "required": ["v"],
-            "properties": { "v": { "title": "anything", "description": "no check", "default": 1, "$comment": "note" } }
+            "properties": { "v": { "title": "anything", "description": "no check", "examples": [1], "$comment": "note" } }
         },
         "tests": [
             { "description": "a number", "data": { "v": 1.5 }, "valid": true, "failures": [] },

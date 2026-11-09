@@ -1,7 +1,0 @@
-invalid string value for default/still valid when the invalid default is used
-invalid string value for default/valid when property is specified
-invalid type for default/still valid when the invalid default is used
-invalid type for default/valid when property is specified
-the default keyword does not do anything if the property is missing/an explicit property value is checked against maximum (failing)
-the default keyword does not do anything if the property is missing/an explicit property value is checked against maximum (passing)
-the default keyword does not do anything if the property is missing/missing properties are not filled in with the default

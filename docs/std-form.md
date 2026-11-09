@@ -1,6 +1,6 @@
 The standard form: values as standard Rust, for use anywhere. A struct per object model, named by a function you pass to [`StdForm`], such as [`names`]; a clash adds `_`. [`fields`] gives each schema name's Rust name, in snake case.
 
-- A required field is `T`, an optional or nullable one `Option<T>`, an optional nullable one `Option<Option<T>>`: absent `None`, null `Some(None)`.
+- A required field is `T`, an optional or nullable one `Option<T>`, an optional nullable one `Option<Option<T>>`: absent `None`, null `Some(None)`. An optional field with a `default` is `T` ([defaults](#defaults)).
 - A value of any kind is `::any_value::Value`, a null `::any_value::Null`, both from the `any-value` crate.
 - A number keeps its width: an integer is the Rust integer of its name, a float `f32` or `f64`. Text is `String`, bytes `Vec<u8>`, a timestamp `chrono::DateTime<chrono::Utc>`, a duration `chrono::TimeDelta`, a list `Vec`, a map a `Vec` of pairs.
 - A `Box` wraps only a field whose type holds its own model.
@@ -16,6 +16,12 @@ A key no field names, in a model's input:
 - **Dropped**, under `x-strip-additional: true`: no field holds it, and `Serialize` writes none. This is schema-emit's own keyword, so `notes` needn't name it.
 - **A failure**, under `additionalProperties: false` (a closed model): it fails the decode. A schema giving it `x-strip-additional` too is invalid.
 - **Kept**, otherwise (an open model): as text, or as a typed value if a check reads it, and `Serialize` writes it back.
+
+## Defaults
+
+A property's `default` is the value its field takes when the decode finds no value for it: the key is absent, or its value is bad and skipped. The value always holds the field, so the field's checks and the model's counts of keys present read it as present, and `Serialize` writes it.
+
+A default is a boolean, a number, or plain text. Lowering judges it by its type, and refuses one of another kind, past the number's width, or failing the type's checks. [Missing](missing.md#smaller-gaps) has the defaults schema-emit can't hold. A struct holding a default derives no `Default`, since Rust's would differ from it.
 
 ## Decode
 
