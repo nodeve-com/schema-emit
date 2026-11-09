@@ -180,8 +180,10 @@ fn names(k: &mut Key) -> Result<(), Error> {
         other => return Err(Error::invalid(format!("`propertyNames` of {other}"))),
     };
     if let Value::Object(s) = &mut schema {
-        s.entry("type")
-            .or_insert_with(|| Value::String("string".into()));
+        if !s.contains_key("$ref") {
+            s.entry("type")
+                .or_insert_with(|| Value::String("string".into()));
+        }
     }
     let ty = k.lower.ty("propertyNames", &schema)?;
     if ty.base != Base::Text {

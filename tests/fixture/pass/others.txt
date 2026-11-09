@@ -6,6 +6,8 @@ a reading with fields and other keys of one type/other keys in range
 key names and a count on an open object/a long other name
 key names and a count on an open object/short names
 key names and a count on an open object/too few keys
+key names by a shared definition/a name that doesn't
+key names by a shared definition/names that match
 keys by pattern, the rest closed/a key by no pattern
 keys by pattern, the rest closed/a key by pattern
 keys by pattern, the rest closed/a key by pattern past its bound

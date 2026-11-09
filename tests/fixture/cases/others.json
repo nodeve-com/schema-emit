@@ -41,6 +41,19 @@
         ]
     },
     {
+        "description": "key names by a shared definition",
+        "schema": {
+            "type": "object",
+            "propertyNames": { "$ref": "#/$defs/Name" },
+            "additionalProperties": { "type": "integer" },
+            "$defs": { "Name": { "type": "string", "pattern": "^[a-z]+$" } }
+        },
+        "tests": [
+            { "description": "names that match", "data": { "a": 1, "bc": 2 }, "valid": true, "failures": [] },
+            { "description": "a name that doesn't", "data": { "a": 1, "B1": 2 }, "valid": false, "failures": ["Value: range"] }
+        ]
+    },
+    {
         "description": "required and dependent keys no field names",
         "schema": {
             "type": "object",
