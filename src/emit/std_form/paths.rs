@@ -27,11 +27,17 @@ impl StdForm<'_> {
         id
     }
 
-    /// Model `m`'s struct, through its module where another crate writes it.
-    pub(super) fn model_path(&self, m: usize) -> String {
+    /// Model `m`'s struct, through its module where another crate writes it, without the types
+    /// its slots hold.
+    pub(super) fn model_bare(&self, m: usize) -> String {
         match (self.external)(m) {
             Some(module) => format!("{module}::{}", self.model_name(m)),
             None => self.model_name(m),
         }
+    }
+
+    /// Model `m`'s type as the item being written names it.
+    pub(super) fn model_path(&self, m: usize) -> String {
+        self.model_bare(m) + &self.args(m)
     }
 }

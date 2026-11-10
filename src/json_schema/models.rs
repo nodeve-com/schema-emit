@@ -140,6 +140,7 @@ pub(super) fn base(lower: &mut Lower, name: &str, s: &Map<String, Value>) -> Res
             checks: Vec::new(),
             others: needed(s, &props, &required).then(|| Ty::of(Base::Any)),
             additional,
+            ..Model::default()
         },
     );
     Ok(Base::Model(index))

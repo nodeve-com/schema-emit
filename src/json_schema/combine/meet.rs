@@ -196,5 +196,6 @@ pub(super) fn kind(base: &Base) -> &'static str {
         Base::Map(_) => "a map",
         Base::Model(_) | Base::Union(_) => "an object",
         Base::Any => "any value",
+        Base::Slot(_) => "a slot",
     }
 }

@@ -26,7 +26,8 @@ pub fn lower_defs(
         )?;
         out.push((name, ty));
     }
-    Ok((lower.out, out))
+    let tys: Vec<&Ty> = out.iter().map(|(_, ty)| ty).collect();
+    Ok((lower.finish(&tys)?, out))
 }
 
 /// The document a type lowers from: the schema, the definitions shared beside it, and the
@@ -42,5 +43,5 @@ pub struct Document<'a> {
 pub fn lower_ty(name: &str, doc: &Document, out: Schema) -> Result<(Schema, Ty), Error> {
     let mut lower = Lower::new(out, doc.schema, doc.shared, doc.notes);
     let ty = lower.ty(name, doc.schema)?;
-    Ok((lower.out, ty))
+    Ok((lower.finish(&[&ty])?, ty))
 }

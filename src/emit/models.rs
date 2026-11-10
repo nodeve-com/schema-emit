@@ -47,10 +47,19 @@ impl<'e> Walk<'_, 'e> {
         checks: &[Check],
     ) -> Result<String, Error> {
         let m = self.get(model)?;
+        let kept = self.e.fill(model);
         let mut out = String::new();
         for (i, f) in m.fields.iter().enumerate() {
-            out.push_str(&self.within_field(&f.name, |w| w.field(value, model, i))?);
+            let field = self.within_field(&f.name, |w| w.field(value, model, i));
+            match field {
+                Ok(code) => out.push_str(&code),
+                Err(e) => {
+                    self.e.fills.borrow_mut().truncate(kept);
+                    return Err(e);
+                }
+            }
         }
+        self.e.fills.borrow_mut().truncate(kept);
         out.push_str(&self.whole(value, model, checks)?);
         Ok(out)
     }

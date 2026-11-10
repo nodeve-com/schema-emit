@@ -12,7 +12,7 @@ impl StdForm<'_> {
     pub(super) fn default_fns(&self) -> String {
         let models = self.schema.models.iter().enumerate();
         (models.filter(|(i, _)| (self.external)(*i).is_none()))
-            .map(|(i, m)| self.model_defaults(i, m))
+            .map(|(i, m)| self.inside(i, || self.model_defaults(i, m)))
             .collect()
     }
 
@@ -42,7 +42,11 @@ impl StdForm<'_> {
         }
         match fns.is_empty() {
             true => fns,
-            false => format!("#[allow(dead_code)] impl {name} {{ {fns}}}\n"),
+            false => format!(
+                "#[allow(dead_code)] impl{} {} {{ {fns}}}\n",
+                self.generics("", ("<", ">")),
+                self.model_path(i)
+            ),
         }
     }
 

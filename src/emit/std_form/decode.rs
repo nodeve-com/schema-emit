@@ -29,6 +29,14 @@ pub(super) fn d(name: &str) -> String {
     format!("{}::decode::{name}", crate::emit::STD)
 }
 
+impl StdForm<'_> {
+    /// The type parameters in scope, each bound to decode from text of any lifetime, as a
+    /// skipped value's second reading needs.
+    pub(super) fn de_generics(&self) -> String {
+        self.generics(&format!("for<'__a> {}<'__a>", d("Deserialize")), (", ", ""))
+    }
+}
+
 /// The code of a model's fields.
 #[derive(Default)]
 struct Fields {
@@ -63,8 +71,8 @@ impl StdForm<'_> {
             out.push_str(&self.union_decoder(union)?);
         }
         for (i, m) in self.schema.models.iter().enumerate() {
-            if (self.external)(i).is_none() {
-                out.push_str(&self.model_decoder(i, m));
+            if (self.external)(i).is_none() && m.of.is_none() {
+                out.push_str(&self.inside(i, || self.model_decoder(i, m)));
             }
         }
         Ok(out)
@@ -93,7 +101,7 @@ impl StdForm<'_> {
     /// Model `i`'s `decode_` function and `Deserialize` impl, or its `decode_` function alone where it
     /// is an alias, which no impl can be written for.
     fn model_decoder(&self, i: usize, m: &Model) -> String {
-        let (name, id) = (self.model_name(i), self.decoder_id(i));
+        let (name, id, slots) = (self.model_path(i), self.decoder_id(i), self.de_generics());
         let (de, deser) = (d("Deserialize"), d("Deserializer"));
         if let (true, Some(f)) = (self.is_alias(i), m.fields.first()) {
             let seed = format!(
@@ -115,9 +123,9 @@ impl StdForm<'_> {
             false => self.object_body(i, m),
         };
         format!(
-            "#[allow(dead_code)] pub fn decode_{id}<'de, __D: {deser}<'de>>(d: __D) \
+            "#[allow(dead_code)] pub fn decode_{id}<'de{slots}, __D: {deser}<'de>>(d: __D) \
              -> ::core::result::Result<({name}, {}), {}> {{ {}(|| <{name} as {de}<'de>>::deserialize(d), {:?}) }}\n\
-             impl<'de> {de}<'de> for {name} {{ \
+             impl<'de{slots}> {de}<'de> for {name} {{ \
              fn deserialize<__D: {deser}<'de>>(d: __D) -> ::core::result::Result<{name}, __D::Error> {{ {body} }} }}\n",
             d("Skips"),
             d("Unfit"),
@@ -154,7 +162,8 @@ impl StdForm<'_> {
 
     /// The body of the impl of a model of an object: a visitor reading its entries.
     fn object_body(&self, i: usize, m: &Model) -> String {
-        let name = self.model_name(i);
+        let (name, value) = (self.model_name(i), self.model_path(i));
+        let (unit, unit_ty, unit_new) = self.unit("__V");
         let (f, u) = (self.fields_code(i, m), self.unnamed(m));
         let keys: Vec<String> = m.fields.iter().map(|f| format!("{:?}", f.name)).collect();
         let (parts, slot, ignored) = (d("Parts"), d("Slot"), d("IgnoredAny"));
@@ -175,12 +184,13 @@ impl StdForm<'_> {
             u.init,
         );
         format!(
-            "#[derive(Clone, Copy)] struct __V; impl<'de> {}<'de> for __V {{ type Value = {name}; \
+            "{unit} impl<'de{}> {}<'de> for {unit_ty} {{ type Value = {value}; \
              const EXPECTED: &'static str = \"an object\"; \
              {} \
              #[allow(unused_mut, unused_variables)] \
-             fn map<__A: {}<'de>>(self, mut m: __A) -> ::core::result::Result<{name}, __A::Error> {{ {read} }} }} \
-             {}::deserialize({}(__V), d)",
+             fn map<__A: {}<'de>>(self, mut m: __A) -> ::core::result::Result<{value}, __A::Error> {{ {read} }} }} \
+             {}::deserialize({}({unit_new}), d)",
+            self.de_generics(),
             d("Kinds"),
             self.model_positions(i, m),
             d("MapAccess"),
@@ -217,8 +227,8 @@ impl StdForm<'_> {
             } else if f.ty.default.is_some() {
                 let _ = write!(
                     out.init,
-                    "{n}: f{k}.unwrap_or_else({}::{}), ",
-                    self.model_name(i),
+                    "{n}: f{k}.unwrap_or_else(<{}>::{}), ",
+                    self.model_path(i),
                     super::defaults::field_fn(n)
                 );
             } else {

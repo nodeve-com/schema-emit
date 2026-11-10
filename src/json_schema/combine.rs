@@ -20,6 +20,7 @@ pub(super) use meet::ty_meet;
 
 use serde_json::{Map, Value};
 
+use super::references::resolve;
 use super::{lists, Done, Key, Lower};
 use crate::ir::{Base, Check, Ty};
 use crate::Error;
@@ -117,12 +118,8 @@ fn is_closed(lower: &Lower, s: &Map<String, Value>) -> bool {
     }
     match s.get("$ref") {
         None => false,
-        Some(target) => match target
-            .as_str()
-            .and_then(|t| t.strip_prefix("#/$defs/"))
-            .and_then(|d| lower.defs.get(d))
-        {
-            Some(Value::Object(def)) => closes(def) || def.contains_key("$ref"),
+        Some(target) => match resolve(lower, "", target).map(|t| t.schema) {
+            Ok(Value::Object(def)) => closes(&def) || def.contains_key("$ref"),
             _ => true,
         },
     }

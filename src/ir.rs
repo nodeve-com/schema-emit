@@ -24,9 +24,29 @@ pub struct Model {
     pub others: Option<Ty>,
     /// What a decode does with keys no field names and nothing reads.
     pub additional: Additional,
+    /// The parts the model leaves open, in name order: its own fields', and those of each model
+    /// with slots a field holds, which takes this model's slot of the same name.
+    pub slots: Vec<Slot>,
+    /// The model this one is, its slots filled. Such a model has no field of its own.
+    pub of: Option<Filled>,
 }
 
 impl Model {
+    /// A model named `name` wrapping `ty`, a value that is no object, in one required field
+    /// named empty.
+    pub fn value(name: &str, ty: Ty) -> Model {
+        let field = Field {
+            name: String::new(),
+            ty,
+            required: true,
+        };
+        Model {
+            name: name.into(),
+            fields: vec![field],
+            ..Model::default()
+        }
+    }
+
     /// Whether the model wraps a root that is no object: one field named empty holds the value,
     /// so a path to it is the model's own.
     pub fn is_value(&self) -> bool {
@@ -106,6 +126,8 @@ pub enum Base {
     Map(Box<Ty>),
     /// [`Schema::models`]' index.
     Model(usize),
+    /// The [`Slot`] of this name in the model holding the value.
+    Slot(String),
     /// One of several types, each a branch: the embedder's enum, a variant per branch in order.
     /// A value is the first branch it fits (`anyOf`), and its checks are that branch's.
     Union(Union),
@@ -136,7 +158,7 @@ impl Base {
     /// `Any`, which may be of every kind.
     pub fn json_kind(&self) -> Option<Json> {
         Some(match self {
-            Base::Any => return None,
+            Base::Any | Base::Slot(_) => return None,
             Base::Null => Json::Null,
             Base::Bool => Json::Bool,
             Base::Int(_) | Base::Float(_) => Json::Number,
@@ -260,8 +282,10 @@ pub enum Count {
     Bytes,
 }
 
+mod slots;
 mod values;
 mod widths;
 
+pub use slots::{Filled, Slot};
 pub use values::{Additional, Lit, Notes, Num};
 pub use widths::{Float, Int};

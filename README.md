@@ -5,6 +5,7 @@ A **schema** describes what valid data looks like: which fields it has and which
 - **Standard Rust types.** A struct per object model, and a value's own type for any other ([`emit::std_form::StdForm`]), its fields named from the schema, with a serde `Deserialize` and `Serialize` it writes out.
 - **Extra keys dropped, kept, or refused.** `x-strip-additional: true` drops keys no field names ([`emit::std_form`] § Extra keys lists all three).
 - **Models written elsewhere.** You can say another module holds a model ([`emit::std_form::StdForm::with_external`]).
+- **Slots.** A model can leave a part for each schema using it to fill, written as one generic struct ([`emit::std_form`] § Slots).
 - **Common value types.** Timestamps and durations are `chrono`'s. `format: human-duration` is a duration. Their text forms are [any-value's](https://github.com/nodeve-com/any-value#timestamps-and-durations-as-text).
 - **Defaults.** Each `default` is a function returning it, a property's or a root's; the decode calls a property's when its key is absent ([`emit::std_form`] § Defaults).
 - **Annotations you name.** A keyword such as a unit rides along when you ask for it. schema-emit refuses any other.

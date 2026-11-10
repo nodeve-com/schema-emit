@@ -17,10 +17,14 @@ impl StdForm<'_> {
         if self.is_alias(model) {
             return format!("Some({value})");
         }
-        let name = self.schema.models.get(model).and_then(|m| {
-            let f = m.fields.get(field)?;
-            Some((idents::of(m).fields.get(field)?.clone(), f.held()))
-        });
+        let name = self
+            .schema
+            .models
+            .get(self.schema.filling(model))
+            .and_then(|m| {
+                let f = m.fields.get(field)?;
+                Some((idents::of(m).fields.get(field)?.clone(), f.held()))
+            });
         match name {
             Some((name, true)) => format!("Some(&{value}.{name})"),
             Some((name, false)) => format!("{value}.{name}.as_ref()"),

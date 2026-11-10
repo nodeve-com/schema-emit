@@ -1,0 +1,2 @@
+$dynamicRef skips over intermediate resources - direct reference/integer property passes
+$dynamicRef skips over intermediate resources - direct reference/string property fails

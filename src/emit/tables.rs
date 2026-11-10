@@ -19,6 +19,7 @@ impl<'a> Emitter<'a> {
             root: Cell::default(),
             extra: RefCell::default(),
             ids: Cell::default(),
+            fills: RefCell::default(),
         }
     }
 
@@ -42,9 +43,19 @@ impl<'a> Emitter<'a> {
     }
 
     /// `pub fn <name>`, checking a `&` of model `model`'s type and reporting to `r`. Each pattern
-    /// is a `static <name>_P<n>`; with any, `pub fn <name>_load` checks every table.
+    /// is a `static <name>_P<n>`; with any, `pub fn <name>_load` checks every table. A model with
+    /// slots takes a function per slot after `r`, in the slots' order, checking a value of it. A
+    /// model filling slots has no check of its own: the model it fills has, taking each slot's.
     pub fn check(&self, model: usize, name: &str) -> Result<String, Error> {
-        self.checked(name, || self.model_check(model, name))
+        let filling = self.schema.filling(model);
+        if filling != model {
+            return Err(Error::invalid(format!(
+                "{name}: model {model} fills model {filling}: check that model, passing each slot's check"
+            )));
+        }
+        (self.std).inside(model, || {
+            self.checked(name, || self.model_check(model, name))
+        })
     }
 
     /// `pub fn <name>`, checking a `&` of `union` as [`Emitter::check`] does a model: the variant
@@ -65,9 +76,10 @@ impl<'a> Emitter<'a> {
     pub(super) fn function(&self, name: &str, path: &str, ty: &Ty) -> Result<String, Error> {
         let rust = self.std.rust(&Ty::of(ty.base.clone()));
         let body = Walk::new(self, path).present("v", ty)?;
+        let (slots, checks) = self.std.check_slots();
         Ok(format!(
             "#[allow(unused_variables, unused_mut, unused_parens, unreachable_patterns, clippy::all)]\n\
-             pub fn {name}<__R: {STD}::Report>(v: &{rust}, r: &mut __R) {{\n{body}}}\n"
+             pub fn {name}<{slots}__R: {STD}::Report>(v: &{rust}, r: &mut __R{checks}) {{\n{body}}}\n"
         ))
     }
 

@@ -22,6 +22,9 @@ pub(super) fn keyword(k: &mut Key) -> Done {
         k.ty.notes.0.insert(k.key.into(), text.into());
         return Some(Ok(()));
     }
+    if k.key == "$dynamicAnchor" {
+        return Some(k.lower.declared(k.value));
+    }
     match k.key {
         "title" | "description" | "$comment" | "examples" | "deprecated" | "readOnly"
         | "writeOnly" | "contentMediaType" | "contentEncoding" | "contentSchema" | "$id"
@@ -35,7 +38,8 @@ pub(super) const METASCHEMA: &str = "https://json-schema.org/draft/2020-12/schem
 
 /// Keywords that name or note a schema and check nothing: a schema holding only these admits
 /// every value.
-const ANNOTATIONS: [&str; 11] = [
+const ANNOTATIONS: [&str; 12] = [
+    "$dynamicAnchor",
     "description",
     "title",
     "$comment",

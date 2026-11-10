@@ -35,19 +35,22 @@ impl StdForm<'_> {
         }
         let len = m.fields.len().saturating_add(usize::from(kept.is_some()));
         let name = self.model_name(i);
-        self.positions(&name, len, &format!("{reads}Ok({name} {{ {init}}})"))
+        let body = format!("{reads}Ok({name} {{ {init}}})");
+        self.positions(&self.model_path(i), len, &body)
     }
 
     /// A `binary` method reading `len` positions with `body`, whose last expression is the
     /// `Result` of a `value`.
     pub(super) fn positions(&self, value: &str, len: usize, body: &str) -> String {
+        let (unit, unit_ty, unit_new) = self.unit("__P");
         format!(
             "fn binary<__D: {}<'de>>(self, d: __D) -> ::core::result::Result<{value}, __D::Error> {{ \
-             struct __P; impl<'de> {}<'de> for __P {{ type Value = {value}; \
+             {unit} impl<'de{}> {}<'de> for {unit_ty} {{ type Value = {value}; \
              const LEN: usize = {len}; \
              fn read<__A: {}<'de>>(self, mut a: __A) -> ::core::result::Result<{value}, __A::Error> {{ {body} }} }} \
-             {}::deserialize({}(__P), d) }}",
+             {}::deserialize({}({unit_new}), d) }}",
             d("Deserializer"),
+            self.de_generics(),
             d("binary::Positions"),
             d("SeqAccess"),
             d("DeserializeSeed"),

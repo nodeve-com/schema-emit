@@ -12,7 +12,7 @@ What depends on which subschema passed: `unevaluatedProperties` beside a branch 
 
 ## References beyond the document
 
-`$dynamicRef`, and a `$ref` to another file or URL, which nothing fetches. A recursive `$ref` beside a keyword that checks, and a `$schema` other than 2020-12's.
+A `$dynamicRef` that is no [slot](std-form.md#slots): one beside other keywords, one naming another document, or one whose model declares no anchor of its name. So too a slot inside a union, a branch, a key no field names, another slot's schema, or a model holding itself. A schema fills a slot once, from its root, beside no keyword that checks. A `$ref` to another file or URL, which nothing fetches. A recursive `$ref` beside a keyword that checks, and a `$schema` other than 2020-12's.
 
 ## Values of more than one kind
 

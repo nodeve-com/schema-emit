@@ -34,13 +34,15 @@ impl StdForm<'_> {
             out.push_str(&self.encoder(&name, &format!("match self {{ {arms}}}")));
         }
         for (i, m) in self.schema.models.iter().enumerate() {
-            if (self.external)(i).is_some() {
+            if (self.external)(i).is_some() || m.of.is_some() {
                 continue;
             }
-            match (self.is_alias(i), m.fields.first()) {
-                (true, Some(f)) => out.push_str(&self.alias_encoder(i, &f.ty)),
-                _ => out.push_str(&self.encoder(&self.model_name(i), &self.encode_body(m))),
-            }
+            out.push_str(
+                &self.inside(i, || match (self.is_alias(i), m.fields.first()) {
+                    (true, Some(f)) => self.alias_encoder(i, &f.ty),
+                    _ => self.encoder(&self.model_path(i), &self.encode_body(m)),
+                }),
+            );
         }
         out
     }
@@ -49,9 +51,10 @@ impl StdForm<'_> {
     fn encoder(&self, name: &str, body: &str) -> String {
         let (ser, serializer) = (d("Serialize"), d("Serializer"));
         format!(
-            "impl {ser} for {name} {{ #[allow(unused_imports)] \
+            "impl{} {ser} for {name} {{ #[allow(unused_imports)] \
              fn serialize<__S: {serializer}>(&self, s: __S) -> ::core::result::Result<__S::Ok, __S::Error> {{ \
              use {ser} as _; use {serializer} as _; use {} as _; use {} as _; {body} }} }}\n",
+            self.generics(&ser, ("<", ">")),
             d("SerializeMap"),
             d("SerializeTuple"),
         )

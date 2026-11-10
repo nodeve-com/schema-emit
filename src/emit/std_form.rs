@@ -1,5 +1,6 @@
 #![doc = include_str!("../../docs/std-form.md")]
 
+use std::cell::Cell;
 use std::fmt::Write as _;
 
 use crate::ir::{Additional, Base, Float, Model, Schema, Ty};
@@ -12,6 +13,7 @@ mod encode;
 mod idents;
 mod paths;
 mod read;
+mod slots;
 mod source;
 mod types;
 mod unions;
@@ -31,6 +33,8 @@ pub struct StdForm<'a> {
     /// The paths of derive macros each struct and enum also derives, beyond `Debug`, `Clone`, and
     /// `PartialEq`.
     pub derive: &'a [&'a str],
+    /// The model whose item is being written, whose slots are the type parameters in scope.
+    within: Cell<Option<usize>>,
 }
 
 /// No model written elsewhere.
@@ -62,6 +66,7 @@ impl<'a> StdForm<'a> {
             name,
             external: &local,
             derive: &[],
+            within: Cell::new(None),
         }
     }
 
@@ -96,6 +101,7 @@ impl<'a> StdForm<'a> {
                 self.ty(item, None)
             ),
             Base::Union(u) => self.union_ty(u, owner),
+            Base::Slot(slot) => self.param(slot),
             Base::Model(m) => match owner {
                 Some(o) if self.holds(*m, o) => {
                     format!("::std::boxed::Box<{}>", self.model_path(*m))
@@ -156,7 +162,7 @@ impl<'a> StdForm<'a> {
 
     /// The name of model `model`'s field of keys no field names.
     fn others_field(&self, model: usize) -> Result<String, Error> {
-        let m = self.schema.models.get(model);
+        let m = self.schema.models.get(self.schema.filling(model));
         Ok(idents::of(m.ok_or_else(|| Error::invalid(format!("no model {model}")))?).others)
     }
 
@@ -181,27 +187,34 @@ impl<'a> StdForm<'a> {
     fn structs(&self) -> String {
         let mut out = self.union_items();
         for (i, m) in self.schema.models.iter().enumerate() {
-            if (self.external)(i).is_some() {
-                continue;
+            if (self.external)(i).is_none() {
+                out.push_str(&self.inside(i, || self.item(i, m)));
             }
-            if let (true, Some(f)) = (self.is_alias(i), m.fields.first()) {
-                let _ = writeln!(
-                    out,
-                    "#[allow(dead_code)] pub type {} = {};",
-                    self.model_name(i),
-                    self.ty(&f.ty, None)
-                );
-                continue;
-            }
-            let _ = writeln!(
-                out,
-                "{} #[allow(dead_code)] pub struct {} {{ {}}}",
-                self.derives(self.defaults(i, &mut Vec::new())),
-                self.model_name(i),
-                self.struct_fields(i, m)
-            );
         }
         out
+    }
+
+    /// Model `i`'s struct, or its alias where it is a value's own type or fills another's slots.
+    fn item(&self, i: usize, m: &Model) -> String {
+        let name = self.model_name(i);
+        let alias = |ty: String| format!("#[allow(dead_code)] pub type {name} = {ty};\n");
+        if let Some(of) = &m.of {
+            let with: Vec<String> = of.with.iter().map(|t| self.ty(t, None)).collect();
+            return alias(format!(
+                "{}<{}>",
+                self.model_bare(of.model),
+                with.join(", ")
+            ));
+        }
+        if let (true, Some(f)) = (self.is_alias(i), m.fields.first()) {
+            return alias(self.ty(&f.ty, None));
+        }
+        format!(
+            "{} #[allow(dead_code)] pub struct {name}{} {{ {}}}\n",
+            self.derives(self.defaults(i, &mut Vec::new())),
+            self.declared(m),
+            self.struct_fields(i, m)
+        )
     }
 
     /// Model `i`'s fields, then its field of keys no field names, as the struct declares them.

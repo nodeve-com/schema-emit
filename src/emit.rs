@@ -18,6 +18,7 @@ mod others;
 mod presence;
 mod recursion;
 mod scalars;
+mod slots;
 pub mod std_form;
 mod tables;
 mod text;
@@ -55,14 +56,16 @@ pub struct Emitter<'a> {
     extra: RefCell<Vec<(String, String)>>,
     /// Numbers the functions of recursive models.
     ids: Cell<usize>,
+    /// What each slot holds in the model being walked, innermost last (`slots.rs`).
+    fills: RefCell<Vec<(String, Ty)>>,
 }
 
 impl<'a> Emitter<'a> {
-    /// Model `model`.
+    /// Model `model`, or the model it fills: the one with its fields.
     fn model(&self, model: usize) -> Result<&'a Model, Error> {
         self.schema
             .models
-            .get(model)
+            .get(self.schema.filling(model))
             .ok_or_else(|| Error::invalid(format!("no model {model}")))
     }
 

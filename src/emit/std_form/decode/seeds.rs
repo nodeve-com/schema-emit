@@ -49,6 +49,7 @@ impl StdForm<'_> {
                 let of = format!("{}::<{}>()", d("of"), self.union_name(u));
                 self.boxed(of, owner.is_some_and(|o| self.boxes(u, o)))
             }
+            Base::Slot(slot) => format!("{}::<{}>()", d("of"), self.param(slot)),
             Base::Model(m) => {
                 let of = format!("{}::<{}>()", d("of"), self.model_path(*m));
                 self.boxed(of, owner.is_some_and(|o| self.holds(*m, o)))
@@ -84,11 +85,13 @@ impl StdForm<'_> {
         });
         let body = format!("{binary_reads}Ok({})", tuple_of(&built));
         let len = prefix.len().saturating_add(usize::from(rest.is_some()));
+        let (unit, unit_ty, unit_new) = self.unit("__T");
         format!(
-            "{{ #[derive(Clone, Copy)] struct __T; impl<'de> {}<'de> for __T {{ type Value = {value}; \
+            "{{ {unit} impl<'de{}> {}<'de> for {unit_ty} {{ type Value = {value}; \
              const EXPECTED: &'static str = \"an array\"; {} \
              fn seq<__A: {}<'de>>(self, mut a: __A) -> ::core::result::Result<Self::Value, __A::Error> {{ \
-             let mut p = {}::default(); {reads}::core::result::Result::Ok({}) }} }} {}(__T) }}",
+             let mut p = {}::default(); {reads}::core::result::Result::Ok({}) }} }} {}({unit_new}) }}",
+            self.de_generics(),
             d("Kinds"),
             self.positions(&value, len, &body),
             d("SeqAccess"),

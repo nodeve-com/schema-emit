@@ -8,9 +8,6 @@
 //! one field named empty ([`Model::is_value`]), so the type refers to itself through a model and
 //! the emitter checks it by a call ([`crate::emit`]).
 
-use std::collections::BTreeMap;
-
-use iri_string::types::{IriAbsoluteStr, IriReferenceStr};
 use percent_encoding::percent_decode_str;
 use serde_json::{Map, Value};
 
@@ -19,15 +16,17 @@ use super::others::counted;
 use super::Lower;
 use crate::ir::{Base, Ty};
 use crate::Error;
-use recursion::only_notes;
+use recursion::{noted, only_notes};
 
+mod index;
 mod recursion;
+mod slots;
+
+use index::join;
+pub(super) use index::{index, within, Index};
 
 /// The base of a document with no `$id`.
 pub(super) const ROOT: &str = "json-schema:///";
-
-/// Each resource and anchor of a document by address: its schema, and the base URI around it.
-pub(super) type Index = BTreeMap<String, (Value, String)>;
 
 /// A `$ref`'s target.
 pub(super) struct Target {
@@ -39,85 +38,6 @@ pub(super) struct Target {
     pub schema: Value,
     /// The base URI around the schema, before its own `$id`.
     pub base: String,
-}
-
-/// `reference` against `base`, as a string with its fragment kept.
-fn join(base: &str, reference: &str) -> Result<String, Error> {
-    let bad =
-        |e: &dyn std::fmt::Display| Error::invalid(format!("`{reference}` against `{base}`: {e}"));
-    let r = IriReferenceStr::new(reference).map_err(|e| bad(&e))?;
-    let b = IriAbsoluteStr::new(base).map_err(|e| bad(&e))?;
-    Ok(r.resolve_against(b).to_string())
-}
-
-/// The base a schema's `$id` makes inside `outer`, or `outer` where it has none.
-pub(super) fn within(outer: &str, schema: &Value) -> String {
-    let id = schema.get("$id").and_then(Value::as_str);
-    let joined = id.and_then(|id| join(outer, id).ok());
-    let joined = joined.unwrap_or_else(|| outer.into());
-    joined.split('#').next().unwrap_or_default().into()
-}
-
-/// Every resource (a schema with an `$id`) and `$anchor` in `root`, and `root` itself.
-pub(super) fn index(root: &Value) -> Index {
-    let mut out = Index::new();
-    walk(root, ROOT, &mut out);
-    out.entry(ROOT.into())
-        .or_insert_with(|| (root.clone(), ROOT.into()));
-    out
-}
-
-/// The keywords whose value is one subschema, and those whose value is a map or a list of them.
-const ONE: [&str; 11] = [
-    "items",
-    "additionalProperties",
-    "contains",
-    "not",
-    "if",
-    "then",
-    "else",
-    "propertyNames",
-    "unevaluatedItems",
-    "unevaluatedProperties",
-    "contentSchema",
-];
-const MANY: [&str; 8] = [
-    "$defs",
-    "properties",
-    "patternProperties",
-    "dependentSchemas",
-    "prefixItems",
-    "allOf",
-    "anyOf",
-    "oneOf",
-];
-
-fn walk(schema: &Value, outer: &str, out: &mut Index) {
-    let Value::Object(s) = schema else {
-        return;
-    };
-    let inner = within(outer, schema);
-    if s.contains_key("$id") {
-        out.entry(inner.clone())
-            .or_insert_with(|| (schema.clone(), outer.into()));
-    }
-    if let Some(anchor) = s.get("$anchor").and_then(Value::as_str) {
-        out.entry(format!("{inner}#{anchor}"))
-            .or_insert_with(|| (schema.clone(), outer.into()));
-    }
-    for (key, value) in s {
-        let key = key.as_str();
-        if ONE.contains(&key) {
-            walk(value, &inner, out);
-        } else if MANY.contains(&key) {
-            let subs: Vec<&Value> = match value {
-                Value::Object(m) => m.values().collect(),
-                Value::Array(xs) => xs.iter().collect(),
-                _ => Vec::new(),
-            };
-            subs.into_iter().for_each(|sub| walk(sub, &inner, out));
-        }
-    }
 }
 
 /// The schema at JSON Pointer `pointer` below `schema`, whose base is `inner`, with the base
@@ -148,7 +68,7 @@ pub(super) fn resolve(lower: &Lower, name: &str, target: &Value) -> Result<Targe
         .decode_utf8()
         .map_err(|_| Error::invalid(format!("{name}: `$ref` {target}")))?;
     let (schema, base) = locate(lower, doc, &frag).ok_or_else(|| {
-        if lower.index.contains_key(doc) {
+        if lower.index.at.contains_key(doc) {
             Error::invalid(format!("{name}: no schema at `{text}`"))
         } else {
             Error::unsupported(format!("{name}: `$ref` {target}"))
@@ -156,12 +76,15 @@ pub(super) fn resolve(lower: &Lower, name: &str, target: &Value) -> Result<Targe
     })?;
     let last = frag.rsplit('/').next().unwrap_or_default();
     let def = frag.strip_prefix("/$defs/").filter(|d| !d.contains('/'));
+    // A resource has one address however a `$ref` spells it: its `$id`.
+    let own = schema.get("$id").map(|_| within(&base, &schema));
+    let named = own.as_ref().and_then(|id| lower.index.names.get(id));
     Ok(Target {
-        key: format!("{doc}#{raw}"),
-        name: if last.is_empty() {
-            "ref".into()
-        } else {
-            last.into()
+        key: own.map_or_else(|| format!("{doc}#{raw}"), |id| format!("{id}#")),
+        name: match (last.is_empty(), named) {
+            (false, _) => last.into(),
+            (true, Some(key)) => key.clone(),
+            (true, None) => "ref".into(),
         },
         def: def.map(|d| d.replace("~1", "/").replace("~0", "~")),
         schema,
@@ -175,10 +98,11 @@ fn locate(lower: &Lower, doc: &str, frag: &str) -> Option<(Value, String)> {
     let found = if frag.is_empty() || frag.starts_with('/') {
         lower
             .index
+            .at
             .get(doc)
             .and_then(|(schema, outer)| pointer(schema, outer, doc, frag))
     } else {
-        lower.index.get(&format!("{doc}#{frag}")).cloned()
+        lower.index.at.get(&format!("{doc}#{frag}")).cloned()
     };
     found.or_else(|| {
         let def = frag.strip_prefix("/$defs/")?;
@@ -249,10 +173,17 @@ impl Lower {
         }
         refuse_beside(name, s, &t)?;
         let plain = only_notes(name, s).is_ok();
-        if let Some(ty) = self.lowered.get(&t.key).filter(|_| plain) {
-            return Ok(ty.clone());
-        }
-        let ty = self.follow(&t, |l| l.ty(&t.name, &t.schema));
+        let ty = match self.lowered.get(&t.key).filter(|_| plain) {
+            Some(ty) => ty.clone(),
+            None => self.target(name, &t, s)?,
+        };
+        let ty = self.cross(name, &t, (s, ty))?;
+        self.keywords(name, s, ty)
+    }
+
+    /// The type of `t`, lowered as the `$ref` in `s` reaches it.
+    fn target(&mut self, name: &str, t: &Target, s: &Map<String, Value>) -> Result<Ty, Error> {
+        let ty = self.follow(t, |l| l.ty(&t.name, &t.schema));
         let wrapper = self.recursions.remove(&t.key);
         let mut ty = ty?;
         // A union a definition declares takes the definition's name, unless one it refers to
@@ -260,15 +191,12 @@ impl Lower {
         if let (Base::Union(u), Some(def)) = (&mut ty.base, &t.def) {
             u.name.get_or_insert_with(|| def.clone());
         }
-        let ty = match wrapper {
-            Some(model) => {
-                only_notes(name, s)?;
-                self.wrap(name, ty, model)
-            }
-            None => self.keywords(name, s, ty)?,
-        };
-        if plain || wrapper.is_some() {
-            self.lowered.insert(t.key, ty.clone());
+        if let Some(model) = wrapper {
+            only_notes(name, s)?;
+            ty = self.wrap(name, ty, model);
+        }
+        if noted(s).is_none() || wrapper.is_some() {
+            self.lowered.insert(t.key.clone(), ty.clone());
         }
         Ok(ty)
     }

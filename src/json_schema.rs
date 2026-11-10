@@ -19,6 +19,7 @@ mod negate;
 mod notes;
 mod others;
 mod references;
+mod root;
 mod scalars;
 mod text;
 mod tuples;
@@ -27,90 +28,22 @@ mod unions;
 
 pub use defs::{lower_defs, lower_ty, Document};
 pub use others::branch_names;
+pub use root::lower;
 
 use std::collections::HashMap;
 
+use root::union;
+
 use serde_json::{Map, Value};
 
-use crate::ir::{Base, Check, Field, Model, Schema, Ty};
+use crate::ir::{Base, Model, Schema, Ty};
 use crate::Error;
-
-/// Lowers `schema` as model `name`: the schema and the model's index in it. An object is the
-/// model's fields; any other root, a scalar, list, map, or nullable, is a model of one required
-/// field named empty ([`Model::is_value`]) holding it, so a path to the value is the model's own.
-/// `#/$defs/<name>` refers to the schema's own `$defs`, else to `shared`. `notes` names the
-/// annotation keywords to carry in [`crate::ir::Notes`].
-pub fn lower(
-    name: &str,
-    schema: &Value,
-    shared: &Map<String, Value>,
-    notes: &[&str],
-) -> Result<(Schema, usize), Error> {
-    let mut lower = Lower::new(Schema::default(), schema, shared, notes);
-    let ty = lower.ty(name, schema)?;
-    if let (Base::Model(m), false) = (&ty.base, ty.nullable) {
-        if let Some(c) = ty.checks.iter().find(|c| !is_model_check(c)) {
-            return Err(Error::unsupported(format!("{name}: {c:?} on a model")));
-        }
-        if let Some(model) = lower.out.models.get_mut(*m) {
-            model.checks = ty.checks.clone();
-        }
-        return Ok((lower.out, *m));
-    }
-    let field = Field {
-        name: String::new(),
-        ty,
-        required: true,
-    };
-    let root = lower.model(Model {
-        name: name.into(),
-        fields: vec![field],
-        ..Model::default()
-    });
-    Ok((lower.out, root))
-}
-
-/// A `type` list: one kind beside `null` is that kind, nullable; `null` alone is null. Two kinds
-/// at once are unsupported.
-fn union<'a>(name: &str, ts: &'a [Value]) -> Result<(&'a str, bool), Error> {
-    let mut kinds = Vec::new();
-    for t in ts {
-        let k = t
-            .as_str()
-            .ok_or_else(|| Error::invalid(format!("{name}: type {t}")))?;
-        kinds.push(k);
-    }
-    let nullable = kinds.contains(&"null");
-    let rest: Vec<&str> = kinds.into_iter().filter(|k| *k != "null").collect();
-    match rest.as_slice() {
-        [kind] => Ok((kind, nullable)),
-        [] if nullable => Ok(("null", false)),
-        _ => Err(Error::unsupported(format!(
-            "{name}: type {}",
-            Value::Array(ts.to_vec())
-        ))),
-    }
-}
-
-/// Whether `c` is a check on a model as a whole, which the model carries as its own.
-fn is_model_check(c: &Check) -> bool {
-    c.is_branch()
-        || matches!(
-            c,
-            Check::Properties { .. }
-                | Check::Dependent { .. }
-                | Check::Present(_)
-                | Check::Matching { .. }
-                | Check::Unmatched { .. }
-                | Check::Names(_)
-                | Check::Unevaluated(_)
-                | Check::OneOf(_)
-        )
-}
 
 /// Lowering in progress: the models so far, and the definitions a `$ref` reads.
 pub(crate) struct Lower {
     out: Schema,
+    /// The resource each model lowered here sits in, by the model's index.
+    homes: Vec<String>,
     defs: Map<String, Value>,
     /// The `$ref`s being followed, innermost last.
     following: Vec<String>,
@@ -176,10 +109,11 @@ impl Lower {
         }
         Lower {
             out,
+            homes: Vec::new(),
             defs,
             following: Vec::new(),
             index: references::index(schema),
-            base: references::ROOT.into(),
+            base: references::within(references::ROOT, schema),
             recursions: HashMap::new(),
             lowered: HashMap::new(),
             notes: notes.iter().map(|n| (*n).into()).collect(),
@@ -212,6 +146,9 @@ impl Lower {
             Value::Bool(admits) => return Ok(boolean::ty(*admits)),
             _ => return Err(Error::unsupported(format!("{name}: a schema of no object"))),
         };
+        if let Some(target) = s.get("$dynamicRef") {
+            return self.slot(name, target, s);
+        }
         if let Some(target) = s.get("$ref") {
             return self.reference(name, target, s);
         }
@@ -270,8 +207,11 @@ impl Lower {
 
     /// Adds a model, returning its index.
     pub(crate) fn model(&mut self, model: Model) -> usize {
+        let index = self.out.models.len();
+        self.homes.resize(index, String::new());
+        self.homes.push(self.base.clone());
         self.out.models.push(model);
-        self.out.models.len().saturating_sub(1)
+        index
     }
 
     /// A model's slot to fill once its fields lower, so a model's index precedes its fields'.

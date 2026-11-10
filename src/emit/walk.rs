@@ -76,6 +76,7 @@ impl<'a, 'e> Walk<'a, 'e> {
                 self.choices(value, ty)
             }
             Base::Any => self.any(ty),
+            Base::Slot(slot) => self.slot_value(value, slot),
             // Checked above, before its branches.
             Base::Union(_) => Err(Error::unsupported("a union beside branches")),
             Base::Model(m) => self.model(value, *m, &ty.checks),
