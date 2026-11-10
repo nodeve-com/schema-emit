@@ -4,6 +4,8 @@
 
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
 
+#[path = "slots/closed.rs"]
+mod closed;
 #[path = "slots/external.rs"]
 mod external;
 #[path = "program/manifest.rs"]

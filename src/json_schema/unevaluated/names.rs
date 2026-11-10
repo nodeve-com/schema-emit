@@ -4,6 +4,7 @@
 use serde_json::{Map, Value};
 
 use super::{all_of, branches, Evaluated};
+use crate::json_schema::references::resolve;
 use crate::json_schema::Lower;
 use crate::Error;
 
@@ -41,7 +42,8 @@ fn scope(lower: &Lower, s: &Map<String, Value>, depth: usize) -> Result<Evaluate
         Some(Value::Object(p)) => p.keys().cloned().collect(),
         _ => Vec::new(),
     };
-    for sub in referenced(lower, s, depth)?.into_iter().chain(all_of(s)) {
+    let followed = referenced(lower, s, depth)?;
+    for sub in followed.iter().chain(all_of(s)) {
         match names_of(lower, sub, depth)? {
             None => return Ok(Evaluated::Everything),
             Some(n) => names.extend(n),
@@ -64,18 +66,21 @@ fn scope(lower: &Lower, s: &Map<String, Value>, depth: usize) -> Result<Evaluate
 }
 
 /// The definition a `$ref` of `s` names, if it has one: a scope reads it too.
-fn referenced<'a>(
-    lower: &'a Lower,
+fn referenced(
+    lower: &Lower,
     s: &Map<String, Value>,
     depth: usize,
-) -> Result<Option<&'a Map<String, Value>>, Error> {
+) -> Result<Option<Map<String, Value>>, Error> {
     let Some(target) = s.get("$ref") else {
         return Ok(None);
     };
-    target
-        .as_str()
-        .and_then(|t| lower.definition(t))
-        .and_then(Value::as_object)
+    // Resolved through the document, so `#/$defs/..` reads the resource the schema sits in.
+    resolve(lower, "", target)
+        .ok()
+        .and_then(|t| match t.schema {
+            Value::Object(m) => Some(m),
+            _ => None,
+        })
         .filter(|_| depth < DEPTH)
         .map(Some)
         .ok_or_else(|| Error::unsupported("`unevaluatedProperties` beside this `$ref`"))

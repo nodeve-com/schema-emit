@@ -18,7 +18,7 @@ use std::borrow::Cow;
 
 use serde_json::{Map, Value};
 
-use super::{Done, Key, Lower};
+use super::{Done, Key};
 use crate::ir::{Base, Check};
 use crate::Error;
 
@@ -139,12 +139,5 @@ fn properties(k: &mut Key) -> Result<(), Error> {
             k.ty.checks.push(Check::Unevaluated(n));
             Ok(())
         }
-    }
-}
-
-impl Lower {
-    /// The definition a `$ref` of `#/$defs/<name>` names.
-    pub(super) fn definition(&self, target: &str) -> Option<&Value> {
-        self.defs.get(target.strip_prefix("#/$defs/")?)
     }
 }
