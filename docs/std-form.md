@@ -36,7 +36,7 @@ The model and each schema filling it sit in one document, each under its own `$i
 
 Each `default` is a function returning it: `<Model>::default_<field>()` for a property's, and `default_<name>()` (the same name rule as `decode_<name>`) for an alias model's root. Anything needing a value it has none of calls it. The decode does so when it finds no value for a field: the key is absent, or its value is bad and skipped. A defaulted field always holds a value, so the field's checks and the model's counts of keys present read it as present, and `Serialize` writes it.
 
-A default is a boolean, a number, or plain text. Lowering judges it by its type, and refuses one of another kind, past the number's width, or failing the type's checks. [Missing](missing.md#smaller-gaps) has the defaults schema-emit can't hold. A struct holding a default derives no `Default`, since Rust's would differ from it.
+A default is a boolean, a number, or plain text. Lowering judges it by its type, and refuses one of another kind, past the number's width, or failing the type's checks. [Missing](missing.md#smaller-gaps) has the defaults schema-emit can't hold. A struct holding a default gets a written `Default` instead of a derived one: each defaulted field takes its default function's value, every other field Rust's default.
 
 ## Decode
 

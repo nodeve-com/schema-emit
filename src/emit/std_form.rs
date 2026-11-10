@@ -211,7 +211,10 @@ impl<'a> StdForm<'a> {
         }
         format!(
             "{} #[allow(dead_code)] pub struct {name}{} {{ {}}}\n",
-            self.derives(self.defaults(i, &mut Vec::new())),
+            self.derives(
+                self.defaults(i, &mut Vec::new())
+                    && m.fields.iter().all(|f| f.ty.default.is_none())
+            ),
             self.declared(m),
             self.struct_fields(i, m)
         )

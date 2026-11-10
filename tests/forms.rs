@@ -232,3 +232,15 @@ fn any_and_null_are_any_values_types() {
         "{any}"
     );
 }
+
+#[test]
+fn a_struct_holding_a_default_writes_its_default_impl() {
+    let schema = json!({
+        "type": "object",
+        "properties": { "n": { "type": "integer", "default": 3 }, "m": { "type": "integer" } }
+    });
+    let items = rooted(&schema);
+    assert!(!items.contains(", Default"), "{items}");
+    assert!(items.contains("Default for Root"), "{items}");
+    assert!(items.contains("n: Self::default_n(), m: ::core::default::Default::default()"));
+}

@@ -29,6 +29,7 @@ pub const CHECK: &str = r##"
     assert_eq!(v(r#"{"id":1,"n":"x"}"#).n, -3);
     assert_eq!(s(r#"{"id":1,"n":"x"}"#), ["Root.n: expected an integer"]);
     assert_eq!((Root::default_n(), Root::default_t()), (-3, "say \"hi\" é".to_string()));
+    assert_eq!(Root::default(), Root { id: 0, on: true, n: -3, f: 1.5, w: 2.0, t: "say \"hi\" é".into() });
     assert_eq!(d(&out(&filled)).unwrap(), filled);
     assert!(out(&filled).contains(r#""on":true"#));
     let bytes = ::postcard::to_allocvec(&given).unwrap();

@@ -5,7 +5,7 @@
 use std::fmt::Write as _;
 
 use super::{idents, StdForm};
-use crate::ir::{Base, Float, Lit, Model, Ty};
+use crate::ir::{Additional, Base, Float, Lit, Model, Ty};
 
 impl StdForm<'_> {
     /// The functions of each model's defaults.
@@ -40,14 +40,41 @@ impl StdForm<'_> {
                 literal(&f.ty, lit)
             );
         }
-        match fns.is_empty() {
-            true => fns,
-            false => format!(
-                "#[allow(dead_code)] impl{} {} {{ {fns}}}\n",
-                self.generics("", ("<", ">")),
-                self.model_path(i)
-            ),
+        if fns.is_empty() {
+            return fns;
         }
+        let path = self.model_path(i);
+        let mut out = format!(
+            "#[allow(dead_code)] impl{} {path} {{ {fns}}}\n",
+            self.generics("", ("<", ">"))
+        );
+        if self.defaults(i, &mut Vec::new()) {
+            out.push_str(&self.default_impl(m, &path));
+        }
+        out
+    }
+
+    /// The `Default` impl of struct `i`, which holds a defaulted field: each such field's
+    /// default function, and Rust's default for the rest.
+    fn default_impl(&self, m: &Model, path: &str) -> String {
+        let names = idents::of(m);
+        let mut fields: Vec<(String, String)> = Vec::new();
+        for (f, n) in m.fields.iter().zip(&names.fields) {
+            let value = match f.ty.default {
+                Some(_) => format!("Self::{}()", field_fn(n)),
+                None => "::core::default::Default::default()".into(),
+            };
+            fields.push((n.clone(), value));
+        }
+        let others = m.others.is_some() || m.additional == Additional::Keep;
+        if others {
+            fields.push((names.others, "::core::default::Default::default()".into()));
+        }
+        let body: String = fields.iter().map(|(n, v)| format!("{n}: {v}, ")).collect();
+        format!(
+            "impl{} ::core::default::Default for {path} {{ fn default() -> Self {{ Self {{ {body}}} }} }}\n",
+            self.generics("::core::default::Default", ("<", ">"))
+        )
     }
 
     /// The name of alias model `i`'s default function, as the emitted code declares it:
