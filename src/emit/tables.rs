@@ -54,6 +54,13 @@ impl<'a> Emitter<'a> {
         self.checked(name, || unions::function(self, union, name))
     }
 
+    /// `pub fn <name>`, checking a `&` of a value of `ty` that isn't null, as [`Emitter::check`]
+    /// does a model: one property's value, apart from the model holding it. Its failures' paths
+    /// start at `path` where a model's start at its name.
+    pub fn check_value(&self, ty: &Ty, path: &str, name: &str) -> Result<String, Error> {
+        self.checked(name, || self.function(name, path, ty))
+    }
+
     /// `pub fn <name>`, checking a `&` of a value of `ty`, its failures' paths from `path`.
     pub(super) fn function(&self, name: &str, path: &str, ty: &Ty) -> Result<String, Error> {
         let rust = self.std.rust(&Ty::of(ty.base.clone()));
@@ -100,5 +107,30 @@ impl<'a> Emitter<'a> {
             );
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_value_check_names_its_failures_from_the_path_given() {
+        let document = serde_json::json!({
+            "type": "object",
+            "properties": {"total": {"type": "integer", "maximum": 10}},
+        });
+        let shared = serde_json::Map::new();
+        let (schema, root) = crate::json_schema::lower("Record", &document, &shared, &[]).unwrap();
+        let name = |_: usize| "Record".to_string();
+        let std = StdForm::new(&schema, &name);
+        let total = &schema.models[root].fields[0];
+        let check = Emitter::new(&std).check_value(&total.ty, "sum", "check_sum");
+        let check = check.unwrap();
+        assert!(check.contains("pub fn check_sum<"), "{check}");
+        assert!(
+            check.contains("\"sum\"") && !check.contains("Record"),
+            "{check}"
+        );
     }
 }
