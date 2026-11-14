@@ -1,7 +1,7 @@
 [package]
 name = "schema-emit"
 description = "JSON Schema to Rust: types with serde decode and encode, and checks over typed values, linking schema-emit-runtime."
-version = "0.6.2"
+version = "0.6.3"
 edition = "2021"
 license = "MPL-2.0"
 repository = "https://github.com/nodeve-com/schema-emit"
@@ -37,4 +37,4 @@ percent-encoding = { version = "2", optional = true }
 postcard = { version = "1", default-features = false, features = ["alloc"] }
 serde_json = { version = "1", features = ["preserve_order", "raw_value"] }
 # The suite reads why a decode fails.
-schema-emit-runtime = { path = "schema-emit-runtime", version = "0.6.2", features = ["decode"] }
+schema-emit-runtime = { path = "schema-emit-runtime", version = "0.6.3", features = ["decode"] }
