@@ -26,7 +26,7 @@ default = ["json-schema"]
 json-schema = ["dep:serde_json", "dep:iri-string", "dep:percent-encoding"]
 
 [dependencies]
-pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "1acab6a86e146143e8ab2ba5bde2dada963df88c", version = "0.6.2", features = ["build"] }
+pattern-emit = { version = "0.6.2", features = ["build"] }
 serde_json = { version = "1", features = ["preserve_order", "raw_value"], optional = true }
 # A `$ref` resolves against its schema's base URI, and its fragment percent-decodes.
 iri-string = { version = "0.7", default-features = false, features = ["alloc"], optional = true }

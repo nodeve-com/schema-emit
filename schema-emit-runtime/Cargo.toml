@@ -22,7 +22,7 @@ decode = ["dep:serde", "dep:serde_json", "dep:chrono", "dep:base64", "dep:any-va
 
 [dependencies]
 # Search only: a pattern check walks a table that schema-emit built.
-pattern-emit = { git = "https://github.com/nodeve-com/pattern-emit", rev = "1acab6a86e146143e8ab2ba5bde2dada963df88c", version = "0.6.2" }
+pattern-emit = "0.6.2"
 # The emitted `Deserialize` impls are serde's; serde_json reads the text, and hands a union's value over as a slice.
 serde = { version = "1", optional = true }
 serde_json = { version = "1", features = ["preserve_order", "raw_value"], optional = true }
@@ -30,7 +30,7 @@ serde_json = { version = "1", features = ["preserve_order", "raw_value"], option
 chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"], optional = true }
 base64 = { version = "0.22", features = ["std"], optional = true }
 # A std value of any kind is its `Value`, and a null its `Null`.
-any-value = { git = "https://github.com/nodeve-com/any-value", rev = "9613b7f1b06773f110b9d9b9f9a1ba6a91f938d2", version = "0.1.0", optional = true }
+any-value = { version = "0.1.0", optional = true }
 
 [dev-dependencies]
 # A binary format, to test that one impl reads it.

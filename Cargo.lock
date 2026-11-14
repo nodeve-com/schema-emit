@@ -44,7 +44,8 @@ checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
 [[package]]
 name = "any-value"
 version = "0.1.0"
-source = "git+https://github.com/nodeve-com/any-value?rev=9613b7f1b06773f110b9d9b9f9a1ba6a91f938d2#9613b7f1b06773f110b9d9b9f9a1ba6a91f938d2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb7a26a39b0424d8f105d88b984b4963ba8090aca1a51cd27af7a7172eb79938"
 dependencies = [
  "chrono",
  "humantime",
@@ -266,7 +267,8 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 [[package]]
 name = "pattern-emit"
 version = "0.6.2"
-source = "git+https://github.com/nodeve-com/pattern-emit?rev=1acab6a86e146143e8ab2ba5bde2dada963df88c#1acab6a86e146143e8ab2ba5bde2dada963df88c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4abd96736833b38c93542a4e9609f95439f349e43e78e8ff3b7943d79e776893"
 dependencies = [
  "regex-automata",
  "regex-syntax",

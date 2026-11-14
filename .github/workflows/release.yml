@@ -1,0 +1,46 @@
+name: release
+on:
+  push:
+    branches: [main]
+jobs:
+  # Publishes each crate whose version isn't on crates.io yet, then tags it and makes its GitHub
+  # release. crates.io's trusted publishing takes the job's identity token: no token secret.
+  release-plz-release:
+    if: github.repository_owner == 'nodeve-com'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: rustup show
+      - uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Opens or updates the pull request that bumps the version and writes the changelog.
+  release-plz-pr:
+    if: github.repository_owner == 'nodeve-com'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: rustup show
+      - uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
