@@ -147,7 +147,7 @@ impl Lower {
             _ => return Err(Error::unsupported(format!("{name}: a schema of no object"))),
         };
         if let Some(target) = s.get("$dynamicRef") {
-            return self.slot(name, target, s);
+            return self.dynamic_ref(name, target, s);
         }
         if let Some(target) = s.get("$ref") {
             return self.reference(name, target, s);

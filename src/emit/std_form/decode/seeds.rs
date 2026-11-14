@@ -49,7 +49,7 @@ impl StdForm<'_> {
                 let of = format!("{}::<{}>()", d("of"), self.union_name(u));
                 self.boxed(of, owner.is_some_and(|o| self.boxes(u, o)))
             }
-            Base::Slot(slot) => format!("{}::<{}>()", d("of"), self.param(slot)),
+            Base::DynamicRef(anchor) => format!("{}::<{}>()", d("of"), self.param(anchor)),
             Base::Model(m) => {
                 let of = format!("{}::<{}>()", d("of"), self.model_path(*m));
                 self.boxed(of, owner.is_some_and(|o| self.holds(*m, o)))

@@ -25,9 +25,9 @@ pub struct Model {
     /// What a decode does with keys no field names and nothing reads.
     pub additional: Additional,
     /// The parts the model leaves open, in name order: its own fields', and those of each model
-    /// with slots a field holds, which takes this model's slot of the same name.
-    pub slots: Vec<Slot>,
-    /// The model this one is, its slots filled. Such a model has no field of its own.
+    /// with dynamic references a field holds, which takes this model's dynamic reference of the same name.
+    pub dynamic_refs: Vec<DynamicRef>,
+    /// The model this one is, its dynamic references filled. Such a model has no field of its own.
     pub of: Option<Filled>,
 }
 
@@ -126,8 +126,8 @@ pub enum Base {
     Map(Box<Ty>),
     /// [`Schema::models`]' index.
     Model(usize),
-    /// The [`Slot`] of this name in the model holding the value.
-    Slot(String),
+    /// The [`DynamicRef`] of this name in the model holding the value.
+    DynamicRef(String),
     /// One of several types, each a branch: the embedder's enum, a variant per branch in order.
     /// A value is the first branch it fits (`anyOf`), and its checks are that branch's.
     Union(Union),
@@ -158,7 +158,7 @@ impl Base {
     /// `Any`, which may be of every kind.
     pub fn json_kind(&self) -> Option<Json> {
         Some(match self {
-            Base::Any | Base::Slot(_) => return None,
+            Base::Any | Base::DynamicRef(_) => return None,
             Base::Null => Json::Null,
             Base::Bool => Json::Bool,
             Base::Int(_) | Base::Float(_) => Json::Number,
@@ -282,10 +282,10 @@ pub enum Count {
     Bytes,
 }
 
-mod slots;
+mod dynamic_refs;
 mod values;
 mod widths;
 
-pub use slots::{Filled, Slot};
+pub use dynamic_refs::{DynamicRef, Filled};
 pub use values::{Additional, Lit, Notes, Num};
 pub use widths::{Float, Int};

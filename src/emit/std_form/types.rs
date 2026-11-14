@@ -54,12 +54,12 @@ fn named(ty: &Ty, out: &mut Vec<usize>) {
 impl StdForm<'_> {
     /// Whether model `m` is a value model written as an alias of its value's type: its root is no
     /// object, it never names itself, directly or through other models, which no alias can, and no
-    /// slot holds it.
+    /// type parameter holds it.
     pub(crate) fn is_alias(&self, m: usize) -> bool {
         let Some(model) = self.schema.models.get(m).filter(|m| m.is_value()) else {
             return false;
         };
-        if self.fills_slot(m) {
+        if self.fills_param(m) {
             return false;
         }
         let mut todo = Vec::new();

@@ -17,16 +17,16 @@ A key no field names, in a model's input:
 - **A failure**, under `additionalProperties: false` (a closed model): it fails the decode. A schema giving it `x-strip-additional` too is invalid.
 - **Kept**, otherwise (an open model): as text, or as a typed value if a check reads it, and `Serialize` writes it back.
 
-## Slots
+## Dynamic references
 
 A model can leave a part open for each schema using it to fill, as a Rust struct leaves a type parameter. JSON Schema spells one with a dynamic reference:
 
-- **The model names a slot** where the part sits, with `$dynamicRef: "#<name>"`. One of its own `$defs` declares `$dynamicAnchor: "<name>"`: what the slot holds where no schema fills it.
-- **A schema fills the slot** by pointing at the model with `$ref` and declaring the same `$dynamicAnchor` on one of its own `$defs`.
+- **The model holds a dynamic reference** where the part sits, with `$dynamicRef: "#<name>"`. One of its own `$defs` declares `$dynamicAnchor: "<name>"`, the dynamic anchor: what the part holds where no schema fills it.
+- **A schema fills it** by pointing at the model with `$ref` and declaring the same `$dynamicAnchor` on one of its own `$defs`.
 
-The model is one generic struct, a type parameter per slot in name order, each defaulting to the model's own anchor. A schema filling the slots gets an alias: that struct holding its own types. schema-emit writes the struct's serde impls, its `decode_<name>`, and its checks once, each calling a slot's own.
+The model is one generic struct, a type parameter per dynamic anchor in name order, each defaulting to the model's own anchor. A schema filling the type parameters gets an alias: that struct holding its own types. schema-emit writes the struct's serde impls, its `decode_<name>`, and its checks once, each calling a type parameter's own.
 
-A slot holds a struct of its own, named from its schema and the `$defs` key: an object's, else a struct of the one field `value`. The struct's check takes a function per slot after the report, in name order, checking a value of it. A failure inside names the slot's struct first. A schema filling the slots has no check of its own.
+A type parameter holds a struct of its own, named from its schema and the `$defs` key: an object's, else a struct of the one field `value`. The struct's check takes a function per type parameter after the report, in name order, checking a value of it. A failure inside names that struct first. A schema filling the type parameters has no check of its own.
 
 The model and each schema filling it sit in one document, each under its own `$id`. The generic struct may be one [written elsewhere](StdForm::with_external), so many documents share it.
 

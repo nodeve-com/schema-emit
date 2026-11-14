@@ -62,7 +62,7 @@ fn closed_definitions_over_allof_lower_alike_as_the_root_and_as_an_embedded_reso
     let find = |s: &Schema, name: &str| s.models.iter().position(|m| m.name == name).unwrap();
     for name in ["Current", "Entry"] {
         let embedded = check(&s, find(&s, name)).unwrap();
-        // The root names its slot types apart from its definitions `address` and `value`.
+        // The root names its dynamic reference types apart from its definitions `address` and `value`.
         let alone = check(&root, find(&root, name)).unwrap();
         assert_eq!(
             embedded,

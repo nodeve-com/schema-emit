@@ -1,5 +1,5 @@
 //! The emitted source of `document` as a program: the generic struct and its fillers decode from
-//! JSON, write back, cross postcard, and check, each slot by its own check.
+//! JSON, write back, cross postcard, and check, each dynamic reference by its own check.
 
 use schema_emit::emit::std_form::source;
 
@@ -83,5 +83,5 @@ pub fn run() {
     let main = format!(
         "#![allow(unused_imports, dead_code, clippy::all)]\nuse ::schema_emit_runtime as __s;\n{items}{MAIN}"
     );
-    assert_eq!(run::execute("schema-emit-slots", &main).trim(), "ok");
+    assert_eq!(run::execute("schema-emit-dynamic-refs", &main).trim(), "ok");
 }

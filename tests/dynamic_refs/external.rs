@@ -1,6 +1,6 @@
 //! A generic struct one module holds, filled from another: module `a` is emitted from the
-//! model's document alone, module `b` from a document filling its slots, the model's own
-//! structs marked as `a`'s. `b` writes only the slot types, their checks, and the aliases.
+//! model's document alone, module `b` from a document filling its dynamic references, the model's own
+//! structs marked as `a`'s. `b` writes only the dynamic reference types, their checks, and the aliases.
 
 use schema_emit::emit::std_form::source;
 use schema_emit::json_schema::lower_defs;
@@ -80,7 +80,7 @@ pub fn run() {
         module("b", &b)
     );
     assert_eq!(
-        run::execute("schema-emit-slots-external", &main).trim(),
+        run::execute("schema-emit-dynamic-refs-external", &main).trim(),
         "ok"
     );
 }

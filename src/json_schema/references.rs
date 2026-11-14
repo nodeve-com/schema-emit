@@ -18,9 +18,9 @@ use crate::ir::{Base, Ty};
 use crate::Error;
 use recursion::{noted, only_notes};
 
+mod dynamic_refs;
 mod index;
 mod recursion;
-mod slots;
 
 use index::join;
 pub(super) use index::{index, within, Index};

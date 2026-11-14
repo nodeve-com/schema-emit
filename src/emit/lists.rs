@@ -137,9 +137,9 @@ impl Walk<'_, '_> {
             Base::Timestamp | Base::Duration | Base::Bytes => Err(Error::unsupported(
                 "`contains` of a timestamp, a duration, or bytes",
             )),
-            Base::Any | Base::Slot(_) => {
-                Err(Error::unsupported("`contains` of any value or a slot"))
-            }
+            Base::Any | Base::DynamicRef(_) => Err(Error::unsupported(
+                "`contains` of any value or a dynamic reference",
+            )),
             Base::List(_) | Base::Tuple { .. } | Base::Map(_) | Base::Model(_) | Base::Union(_) => {
                 Err(Error::unsupported(
                     "`contains` of an object, a list, or a map",
@@ -205,9 +205,13 @@ impl Walk<'_, '_> {
             }
             Base::List(item) => self.same_items(a, b, item)?,
             Base::Model(m) => self.same_fields(a, b, *m)?,
-            Base::Any | Base::Map(_) | Base::Tuple { .. } | Base::Union(_) | Base::Slot(_) => {
+            Base::Any
+            | Base::Map(_)
+            | Base::Tuple { .. }
+            | Base::Union(_)
+            | Base::DynamicRef(_) => {
                 return Err(Error::unsupported(
-                    "`uniqueItems` over a map, a tuple, a slot, or any value",
+                    "`uniqueItems` over a map, a tuple, a dynamic reference, or any value",
                 ))
             }
         })

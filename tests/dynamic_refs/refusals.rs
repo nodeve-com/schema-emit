@@ -1,4 +1,4 @@
-//! What is no slot, and so doesn't lower: each refusal, with its reason.
+//! What is no dynamic reference, and so doesn't lower: each refusal, with its reason.
 
 use schema_emit::json_schema::{lower, lower_defs};
 use serde_json::{json, Map, Value};
@@ -15,7 +15,7 @@ fn refused(change: impl FnOnce(&mut Value)) -> String {
 }
 
 #[test]
-fn a_dynamic_reference_that_is_no_slot_is_refused() {
+fn a_dynamic_reference_that_is_no_model_part_is_refused() {
     let parcel = |d: &mut Value, at: &str, to: Value| d["$defs"]["Parcel"]["properties"][at] = to;
     let beside = refused(|d| {
         parcel(
@@ -37,31 +37,34 @@ fn a_dynamic_reference_that_is_no_slot_is_refused() {
 }
 
 #[test]
-fn a_slot_no_type_parameter_can_stand_for_is_refused() {
-    let slot = json!({ "$dynamicRef": "#contents" });
+fn a_dynamic_reference_no_type_parameter_can_stand_for_is_refused() {
+    let dynamic_ref = json!({ "$dynamicRef": "#contents" });
     let parcel = |d: &mut Value, to: Value| d["$defs"]["Parcel"]["properties"]["label"] = to;
-    let union = refused(|d| parcel(d, json!({ "anyOf": [slot, { "type": "null" }] })));
+    let union = refused(|d| parcel(d, json!({ "anyOf": [dynamic_ref, { "type": "null" }] })));
     assert!(
-        union.contains("a slot outside an object's property"),
+        union.contains("a dynamic reference outside an object's property"),
         "{union}"
     );
     let own = refused(|d| {
         d["$defs"]["Parcel"]["$defs"]["label"] =
-            anchor("label", json!({ "type": "array", "items": slot }));
+            anchor("label", json!({ "type": "array", "items": dynamic_ref }));
     });
-    assert!(own.contains("own schema reaches a slot"), "{own}");
+    assert!(
+        own.contains("own schema reaches a dynamic reference"),
+        "{own}"
+    );
     let itself = refused(|d| d["$defs"]["Parcel"]["properties"]["next"] = json!({ "$ref": "#" }));
-    assert!(itself.contains("a slot outside"), "{itself}");
+    assert!(itself.contains("a dynamic reference outside"), "{itself}");
     let root = json!({ "$dynamicRef": "#x", "$defs": { "x": anchor("x", json!({})) } });
     let err = lower("Root", &root, &Map::new(), &[]).unwrap_err();
     assert!(
-        err.unsupported && err.message.contains("a slot outside"),
+        err.unsupported && err.message.contains("a dynamic reference outside"),
         "{err}"
     );
 }
 
 #[test]
-fn a_slot_filled_twice_or_away_from_a_root_is_refused() {
+fn a_dynamic_reference_filled_twice_or_away_from_a_root_is_refused() {
     let again = refused(|d| {
         d["$defs"]["Again"] = json!({ "$id": "again", "$ref": "book-parcel", "$defs": {
             "contents": anchor("contents", json!({ "type": "string" }))

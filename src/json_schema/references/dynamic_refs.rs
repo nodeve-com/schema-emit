@@ -1,10 +1,10 @@
-//! Slots. A `$dynamicRef: "#<name>"` alone in its schema is a slot of the model holding it, where
-//! one of its resource's own `$defs` declares `$dynamicAnchor: "<name>"`: the slot's own type. A
-//! model holding a model of its resource with slots has those slots too.
+//! Dynamic references. A `$dynamicRef: "#<name>"` alone in its schema is a dynamic reference of the model holding it, where
+//! one of its resource's own `$defs` declares `$dynamicAnchor: "<name>"`: the dynamic anchor's own type. A
+//! model holding a model of its resource with dynamic references has those dynamic references too.
 //!
-//! A `$ref` into another resource fills the slots its own resource declares anchors for, making
+//! A `$ref` into another resource fills the dynamic references its own resource declares anchors for, making
 //! a model that is the target with those types ([`Filled`]). It fills from its resource's root
-//! only, so the anchor in force is the one JSON Schema's dynamic scope gives. A slot filled or
+//! only, so the anchor in force is the one JSON Schema's dynamic scope gives. A dynamic reference filled or
 //! left as its own type stays so: a `$ref` from a resource declaring its anchor is refused. The
 //! filled model's type keeps the checks the target's carries.
 
@@ -16,7 +16,7 @@ use crate::ir::{Base, Model, Ty};
 use crate::json_schema::{notes, Lower};
 use crate::Error;
 
-/// The slot names a type reaches: those open in its resource, and those already filled or left
+/// The dynamic reference names a type reaches: those open in its resource, and those already filled or left
 /// as their own type.
 #[derive(Default)]
 struct Reach {
@@ -26,9 +26,9 @@ struct Reach {
 }
 
 impl Lower {
-    /// Whether the resource being lowered declares anchor `slot`.
-    fn declares(&self, slot: &str) -> bool {
-        let key = format!("{}#{slot}", self.base);
+    /// Whether the resource being lowered declares anchor `dynamic_ref`.
+    fn declares(&self, dynamic_ref: &str) -> bool {
+        let key = format!("{}#{dynamic_ref}", self.base);
         self.index.dynamic.contains_key(&key)
     }
 
@@ -42,8 +42,8 @@ impl Lower {
         }
     }
 
-    /// `s`, holding `$dynamicRef` `target`: the slot it names.
-    pub(in crate::json_schema) fn slot(
+    /// `s`, holding `$dynamicRef` `target`: the dynamic reference it names.
+    pub(in crate::json_schema) fn dynamic_ref(
         &mut self,
         name: &str,
         target: &Value,
@@ -55,22 +55,22 @@ impl Lower {
             return Err(refuse("beside another keyword"));
         }
         let text = target.as_str().unwrap_or_default();
-        let Some(slot) = text.strip_prefix('#').filter(|n| !n.starts_with('/')) else {
+        let Some(dynamic_ref) = text.strip_prefix('#').filter(|n| !n.starts_with('/')) else {
             return Err(refuse("names another document"));
         };
-        if !self.declares(slot) {
+        if !self.declares(dynamic_ref) {
             return Err(refuse("names no `$dynamicAnchor` its resource declares"));
         }
         let home = self.base.clone();
-        self.anchor(name, &home, slot)?;
-        Ok(Ty::of(Base::Slot(slot.into())))
+        self.anchor(name, &home, dynamic_ref)?;
+        Ok(Ty::of(Base::DynamicRef(dynamic_ref.into())))
     }
 
-    /// The type of the schema declaring anchor `slot` in resource `home`.
-    fn anchor(&mut self, name: &str, home: &str, slot: &str) -> Result<Ty, Error> {
-        let Some(def) = self.index.dynamic.get(&format!("{home}#{slot}")) else {
+    /// The type of the schema declaring anchor `dynamic_ref` in resource `home`.
+    fn anchor(&mut self, name: &str, home: &str, dynamic_ref: &str) -> Result<Ty, Error> {
+        let Some(def) = self.index.dynamic.get(&format!("{home}#{dynamic_ref}")) else {
             return Err(Error::unsupported(format!(
-                "{name}: slot `{slot}`, which its resource declares no `$dynamicAnchor` for"
+                "{name}: dynamic reference `{dynamic_ref}`, which its resource declares no `$dynamicAnchor` for"
             )));
         };
         let def = def.clone();
@@ -84,7 +84,7 @@ impl Lower {
         }
         if self.following.contains(&t.key) {
             return Err(Error::unsupported(format!(
-                "{name}: slot `{slot}` holds itself"
+                "{name}: dynamic reference `{dynamic_ref}` holds itself"
             )));
         }
         t.name = match self.index.names.get(home) {
@@ -97,7 +97,7 @@ impl Lower {
             || !(reach.open.is_empty() && reach.sealed.is_empty())
         {
             return Err(Error::unsupported(format!(
-                "{name}: slot `{slot}`'s own schema reaches a slot or itself"
+                "{name}: dynamic reference `{dynamic_ref}`'s own schema reaches a dynamic reference or itself"
             )));
         }
         let ty = self.own_type(&t.name, ty);
@@ -105,8 +105,8 @@ impl Lower {
         Ok(ty)
     }
 
-    /// `ty` as a type a slot holds: an object's model, else a model of the one value, named
-    /// `name`, so each has the decode, encode, and check a model with the slot calls.
+    /// `ty` as a type a dynamic reference holds: an object's model, else a model of the one value, named
+    /// `name`, so each has the decode, encode, and check a model with the dynamic reference calls.
     fn own_type(&mut self, name: &str, ty: Ty) -> Ty {
         if matches!(ty.base, Base::Model(_)) && !ty.nullable && ty.checks.is_empty() {
             return ty;
@@ -114,7 +114,7 @@ impl Lower {
         Ty::of(Base::Model(self.model(Model::value(name, ty))))
     }
 
-    /// The slot names `ty`, a type of resource `home`, reaches.
+    /// The dynamic reference names `ty`, a type of resource `home`, reaches.
     fn reach(&self, ty: &Ty, home: &str) -> Reach {
         let mut out = Reach::default();
         self.reach_in(ty, Some(home), &mut out);
@@ -123,11 +123,11 @@ impl Lower {
         out
     }
 
-    /// [`Lower::reach`] into `out`, `home` the resource whose slots are open, where any is.
+    /// [`Lower::reach`] into `out`, `home` the resource whose dynamic references are open, where any is.
     fn reach_in(&self, ty: &Ty, home: Option<&str>, out: &mut Reach) {
         match &ty.base {
-            Base::Slot(n) if home.is_some() => out.open.push(n.clone()),
-            Base::Slot(n) => out.sealed.push(n.clone()),
+            Base::DynamicRef(n) if home.is_some() => out.open.push(n.clone()),
+            Base::DynamicRef(n) => out.sealed.push(n.clone()),
             Base::Model(m) if !out.seen.contains(&(*m, home.is_some())) => {
                 out.seen.push((*m, home.is_some()));
                 let inner = home.filter(|h| self.homes.get(*m).is_some_and(|own| own == h));
@@ -154,7 +154,7 @@ impl Lower {
     }
 
     /// `ty`, the target `t` of the `$ref` in `s`, as the schema holding the `$ref` takes it: the
-    /// same in `t`'s own resource, else its slots filled where this resource declares them.
+    /// same in `t`'s own resource, else its dynamic references filled where this resource declares them.
     pub(super) fn cross(
         &mut self,
         name: &str,
@@ -171,7 +171,8 @@ impl Lower {
             Ok(None) => return Ok(ty),
             Err((n, why)) => {
                 let target = &t.name;
-                let message = format!("{name}: slot `{n}` of `{target}` is filled {why}");
+                let message =
+                    format!("{name}: dynamic reference `{n}` of `{target}` is filled {why}");
                 return Err(Error::unsupported(message));
             }
         };
@@ -189,7 +190,7 @@ impl Lower {
     }
 
     /// The model the `$ref` in `s` fills, `ty` its target's type reaching `reach`: `None` where
-    /// this resource declares none of its slots, and the slot and why where it can't fill one.
+    /// this resource declares none of its dynamic references, and the dynamic reference and why where it can't fill one.
     fn filler(
         &self,
         reach: &Reach,

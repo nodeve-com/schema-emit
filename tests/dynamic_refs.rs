@@ -1,18 +1,18 @@
-//! Slots: a model leaving parts open lowers to one model with slots and a model per schema
-//! filling them, emits as one generic struct and an alias per filler, and what isn't a slot is
-//! refused (`slots/refusals.rs`). `slots/program.rs` builds the emitted source and runs it.
+//! Dynamic references: a model leaving parts open lowers to one model with dynamic references and a model per schema
+//! filling them, emits as one generic struct and an alias per filler, and what isn't a dynamic reference is
+//! refused (`dynamic_refs/refusals.rs`). `dynamic_refs/program.rs` builds the emitted source and runs it.
 
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
 
-#[path = "slots/closed.rs"]
+#[path = "dynamic_refs/closed.rs"]
 mod closed;
-#[path = "slots/external.rs"]
+#[path = "dynamic_refs/external.rs"]
 mod external;
 #[path = "program/manifest.rs"]
 mod manifest;
-#[path = "slots/program.rs"]
+#[path = "dynamic_refs/program.rs"]
 mod program;
-#[path = "slots/refusals.rs"]
+#[path = "dynamic_refs/refusals.rs"]
 mod refusals;
 #[allow(dead_code)]
 #[path = "suite/run.rs"]
@@ -35,7 +35,7 @@ pub fn anchor(name: &str, mut schema: Value) -> Value {
     schema
 }
 
-/// A model with a required slot, an optional one of any value, one in a nested object, and one
+/// A model with a required dynamic reference, an optional one of any value, one in a nested object, and one
 /// in another definition of its resource.
 pub fn parcel() -> Value {
     json!({
@@ -64,7 +64,7 @@ pub fn parcel() -> Value {
     })
 }
 
-/// A closed model built with `allOf` over an open one, holding a slot of any value.
+/// A closed model built with `allOf` over an open one, holding a dynamic reference of any value.
 fn sealed() -> Value {
     json!({
         "$id": "sealed",
@@ -133,24 +133,23 @@ fn check(s: &Schema, model: usize) -> Result<String, schema_emit::Error> {
 }
 
 #[test]
-fn a_model_holds_its_slots_and_a_filler_the_types_filling_them() {
+fn a_model_holds_its_dynamic_refs_and_a_filler_the_types_filling_them() {
     let (s, defs) = lowered();
     let parcel = model(&defs, "Parcel");
-    let slots: Vec<&str> = (s.models[parcel].slots.iter().map(|s| s.name.as_str())).collect();
-    assert_eq!(slots, ["contents", "label"]);
+    let refs = &s.models[parcel].dynamic_refs;
+    assert_eq!(
+        refs.iter().map(|r| &*r.name).collect::<Vec<_>>(),
+        ["contents", "label"]
+    );
     assert_eq!(
         s.models[parcel].fields[1].ty.base,
-        Base::Slot("contents".into())
+        Base::DynamicRef("contents".into())
     );
     let named = |ty: &Ty| match ty.base {
         Base::Model(m) => s.models[m].name.clone(),
         _ => format!("{:?}", ty.base),
     };
-    let own: Vec<String> = s.models[parcel]
-        .slots
-        .iter()
-        .map(|s| named(&s.ty))
-        .collect();
+    let own: Vec<String> = refs.iter().map(|r| named(&r.ty)).collect();
     assert_eq!(own, ["Parcel.contents", "Parcel.label"]);
     let filled = |name: &str| {
         let of = s.models[model(&defs, name)].of.clone().unwrap();
@@ -168,11 +167,11 @@ fn a_model_holds_its_slots_and_a_filler_the_types_filling_them() {
     let book = s.filled(model(&defs, "BookParcel")).unwrap();
     assert_eq!(book.name, "BookParcel");
     assert_eq!(named(&book.fields[1].ty), "BookParcel.contents");
-    assert!(book.slots.is_empty() && s.filled(model(&defs, "Sealed")).is_some());
+    assert!(book.dynamic_refs.is_empty() && s.filled(model(&defs, "Sealed")).is_some());
 }
 
 #[test]
-fn a_model_with_slots_is_one_generic_struct_and_a_filler_an_alias() {
+fn a_model_with_dynamic_refs_is_one_generic_struct_and_a_filler_an_alias() {
     let (s, _) = lowered();
     let items = items(&s);
     for part in [
@@ -222,29 +221,29 @@ fn a_generic_struct_written_elsewhere_is_filled_through_its_module() {
 }
 
 #[test]
-fn a_check_takes_each_slots_own_and_a_filler_has_none() {
+fn a_check_takes_each_dynamic_refs_own_and_a_filler_has_none() {
     let (s, defs) = lowered();
     let check = check(&s, model(&defs, "Parcel")).unwrap();
     assert!(
-        check.contains("pub fn ok<Contents, Label, __R: __s::Report>(v: &Parcel<Contents, Label>, r: &mut __R, slot_contents: impl Fn(&Contents, &mut __R), slot_label: impl Fn(&Label, &mut __R))"),
+        check.contains("pub fn ok<Contents, Label, __R: __s::Report>(v: &Parcel<Contents, Label>, r: &mut __R, param_contents: impl Fn(&Contents, &mut __R), param_label: impl Fn(&Label, &mut __R))"),
         "{check}"
     );
-    assert_eq!(check.matches("slot_contents(").count(), 3, "{check}");
+    assert_eq!(check.matches("param_contents(").count(), 3, "{check}");
     let err = crate::check(&s, model(&defs, "BookParcel")).unwrap_err();
     assert!(!err.unsupported && err.message.contains("fills"), "{err}");
 }
 
 #[test]
-fn a_model_with_slots_held_from_another_resource_holds_each_slots_own_type() {
+fn a_model_with_dynamic_refs_held_from_another_resource_holds_each_dynamic_refs_own_type() {
     let mut document = document();
     document["$defs"]["Shelf"] = json!({ "$id": "shelf", "type": "object",
         "properties": { "first": { "$ref": "parcel" }, "all": { "type": "array", "items": { "$ref": "book-parcel" } } }
     });
     let (s, defs) = lower_defs(&document, &Map::new(), &[]).unwrap();
-    assert!(s.models[model(&defs, "Shelf")].slots.is_empty());
+    assert!(s.models[model(&defs, "Shelf")].dynamic_refs.is_empty());
     let check = check(&s, model(&defs, "Shelf")).unwrap();
     assert!(
-        check.contains("\"Shelf.all[].contents.title\"") && !check.contains("slot_"),
+        check.contains("\"Shelf.all[].contents.title\"") && !check.contains("param_"),
         "{check}"
     );
     let items = items(&s);

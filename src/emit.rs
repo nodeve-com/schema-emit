@@ -18,11 +18,11 @@ mod others;
 mod presence;
 mod recursion;
 mod scalars;
-mod slots;
 pub mod std_form;
 mod tables;
 mod text;
 mod tuples;
+mod type_params;
 mod unevaluated;
 mod unions;
 mod walk;
@@ -56,7 +56,7 @@ pub struct Emitter<'a> {
     extra: RefCell<Vec<(String, String)>>,
     /// Numbers the functions of recursive models.
     ids: Cell<usize>,
-    /// What each slot holds in the model being walked, innermost last (`slots.rs`).
+    /// What each type parameter holds in the model being walked, innermost last (`type_params.rs`).
     fills: RefCell<Vec<(String, Ty)>>,
 }
 

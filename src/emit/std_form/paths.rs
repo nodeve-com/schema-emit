@@ -28,7 +28,7 @@ impl StdForm<'_> {
     }
 
     /// Model `m`'s struct, through its module where another crate writes it, without the types
-    /// its slots hold.
+    /// its type parameters hold.
     pub(super) fn model_bare(&self, m: usize) -> String {
         match (self.external)(m) {
             Some(module) => format!("{module}::{}", self.model_name(m)),

@@ -13,8 +13,8 @@ mod encode;
 mod idents;
 mod paths;
 mod read;
-mod slots;
 mod source;
+mod type_params;
 mod types;
 mod unions;
 
@@ -33,7 +33,7 @@ pub struct StdForm<'a> {
     /// The paths of derive macros each struct and enum also derives, beyond `Debug`, `Clone`, and
     /// `PartialEq`.
     pub derive: &'a [&'a str],
-    /// The model whose item is being written, whose slots are the type parameters in scope.
+    /// The model whose item is being written, whose type parameters are in scope.
     within: Cell<Option<usize>>,
 }
 
@@ -101,7 +101,7 @@ impl<'a> StdForm<'a> {
                 self.ty(item, None)
             ),
             Base::Union(u) => self.union_ty(u, owner),
-            Base::Slot(slot) => self.param(slot),
+            Base::DynamicRef(anchor) => self.param(anchor),
             Base::Model(m) => match owner {
                 Some(o) if self.holds(*m, o) => {
                     format!("::std::boxed::Box<{}>", self.model_path(*m))
@@ -194,7 +194,7 @@ impl<'a> StdForm<'a> {
         out
     }
 
-    /// Model `i`'s struct, or its alias where it is a value's own type or fills another's slots.
+    /// Model `i`'s struct, or its alias where it is a value's own type or fills another's type parameters.
     fn item(&self, i: usize, m: &Model) -> String {
         let name = self.model_name(i);
         let alias = |ty: String| format!("#[allow(dead_code)] pub type {name} = {ty};\n");
