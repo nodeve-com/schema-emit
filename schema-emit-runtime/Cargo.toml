@@ -1,7 +1,7 @@
 [package]
 name = "schema-emit-runtime"
 description = "What checks that schema-emit writes link: why a value fails, and where a failure goes."
-version = "0.6.2"
+version = "0.6.3"
 edition = "2021"
 license = "MPL-2.0"
 repository = "https://github.com/nodeve-com/schema-emit"
