@@ -1,6 +1,6 @@
 The standard form: values as standard Rust, for use anywhere. A struct per object model, named by a function you pass to [`StdForm`], such as [`names`]; a clash adds `_`. [`fields`] gives each schema name's Rust name, in snake case.
 
-- A required field is `T`, an optional or nullable one `Option<T>`, an optional nullable one `Option<Option<T>>`: absent `None`, null `Some(None)`. An optional field with a `default` is `T` ([defaults](#defaults)).
+- A required field is `T`, an optional or nullable one `Option<T>`, an optional nullable one `Option<Option<T>>`: absent `None`, null `Some(None)`. An optional field with a `default` is `T` ([defaults](#defaults)). A required field a program fills later is `Option<T>` ([fields filled later](#fields-filled-later)).
 - A value of any kind is `::any_value::Value`, a null `::any_value::Null`, both from the `any-value` crate.
 - A number keeps its width: an integer is the Rust integer of its name, a float `f32` or `f64`. Text is `String`, bytes `Vec<u8>`, a timestamp `chrono::DateTime<chrono::Utc>`, a duration `chrono::TimeDelta`, a list `Vec`, a map a `Vec` of pairs.
 - A `Box` wraps only a field whose type holds its own model.
@@ -30,6 +30,8 @@ A type parameter holds a struct of its own, named from its schema and the `$defs
 
 The model and each schema filling it sit in one document, each under its own `$id`. The generic struct may be one [written elsewhere](StdForm::with_external), so many documents share it.
 
+`ir::Schema::filled` gives a filling schema's model as one that fills nothing: each dynamic reference, at any depth, replaced by the type filling it. A program reading a model's fields this way needs to know nothing of dynamic references.
+
 [Missing](missing.md#references-beyond-the-document) has the dynamic references schema-emit refuses.
 
 ## Defaults
@@ -37,6 +39,15 @@ The model and each schema filling it sit in one document, each under its own `$i
 Each `default` is a function returning it: `<Model>::default_<field>()` for a property's, and `default_<name>()` (the same name rule as `decode_<name>`) for an alias model's root. Anything needing a value it has none of calls it. The decode does so when it finds no value for a field: the key is absent, or its value is bad and skipped. A defaulted field always holds a value, so the field's checks and the model's counts of keys present read it as present, and `Serialize` writes it.
 
 A default is a boolean, a number, or plain text. Lowering judges it by its type, and refuses one of another kind, past the number's width, or failing the type's checks. [Missing](missing.md#smaller-gaps) has the defaults schema-emit can't hold. A struct holding a default gets a written `Default` instead of a derived one: each defaulted field takes its default function's value, every other field Rust's default.
+
+## Fields filled later
+
+A program may fill a struct one field at a time, so a field its schema requires starts empty. `StdForm::with_empty` takes the path of each such field from the root model, as `total` or `place.key`. A path runs through a `$ref`, or what fills a dynamic reference, as it runs through an object.
+
+- **Each sits as `Option<T>`**, as an optional field does. One with a [default](#defaults) stays `T`, holding its default.
+- **The decode and the model's check take it absent**, without a failure.
+- **`required` stays a fact.** `ir::Field::required` still says the schema requires the field. The program judges one left empty, once it has filled the struct.
+- **One model is one struct.** A field named through one use of a `$defs` model is `Option<T>` at every use of it.
 
 ## Decode
 
