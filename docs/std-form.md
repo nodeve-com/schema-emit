@@ -30,7 +30,7 @@ A type parameter holds a struct of its own, named from its schema and the `$defs
 
 The model and each schema filling it sit in one document, each under its own `$id`. The generic struct may be one [written elsewhere](StdForm::with_external), so many documents share it.
 
-`ir::Schema::filled` gives a filling schema's model as one that fills nothing: each dynamic reference, at any depth, replaced by the type filling it. A program reading a model's fields this way needs to know nothing of dynamic references.
+`ir::Schema::filled` gives the schema with every model filling nothing: each dynamic reference, at any depth, replaced by the type filling it. `filling` names the struct holding each model. A program reading fields this way needs to know nothing of dynamic references.
 
 [Missing](missing.md#references-beyond-the-document) has the dynamic references schema-emit refuses.
 
