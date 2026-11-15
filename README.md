@@ -59,7 +59,7 @@ Why an emitted `Deserialize`, not `#[derive(Deserialize)]`: a union takes its fi
 
 ## Use
 
-1. [`json_schema::lower`] takes the keywords to carry (`notes`) and returns an [`ir::Schema`], the IR the emitter reads, and the named model's index. [`json_schema::lower_defs`] takes every `$defs` entry of a rootless document. A definition named twice is one model. `ir::Schema::named` gives each `$defs` entry the schema reads, by name and type, so no caller reads the document again. The default `json-schema` feature holds it.
+1. [`json_schema::lower`] takes the keywords to carry (`notes`) and returns an [`ir::Schema`], the IR the emitter reads, and the named model's index. [`json_schema::lower_defs`] takes every `$defs` entry of a rootless document. A definition named twice is one model. [`json_schema::join`] puts a second document's definitions among a first's, and [`json_schema::defs`] gives a document's own, for `lower`'s `shared`. `ir::Schema::named` gives each `$defs` entry the schema reads, by name and type, so no caller reads the document again. The default `json-schema` feature holds it.
 2. [`emit::Emitter`] takes a [`emit::std_form::StdForm`] and writes one function per model, checking a value of its std form.
 3. The embedder writes the crate around it: `use ::schema_emit_runtime as __s;`, the model types, and a call passing a `Report`. schema-emit builds nothing.
 
