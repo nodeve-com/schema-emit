@@ -1,4 +1,5 @@
-//! Every definition of a document with no root of its own, lowered together.
+//! A document's definitions: each one lowered together where the document has no root of its
+//! own, and those its root reaches where it has.
 
 use serde_json::{Map, Value};
 
@@ -14,12 +15,8 @@ pub fn lower_defs(
     notes: &[&str],
 ) -> Result<Schema, Error> {
     let mut lower = Lower::new(Schema::default(), schema, shared, notes);
-    let names: Vec<String> = match schema.get("$defs") {
-        Some(Value::Object(defs)) => defs.keys().cloned().collect(),
-        _ => Vec::new(),
-    };
     let mut named = Vec::new();
-    for name in names {
+    for name in def_names(schema) {
         let target = serde_json::json!({ "$ref": references::def_ref(&name) });
         let ty = lower.ty(&name, &target)?;
         named.push((name, ty));
@@ -28,6 +25,27 @@ pub fn lower_defs(
     let mut out = lower.finish(&tys)?;
     out.named = named;
     Ok(out)
+}
+
+impl Lower {
+    /// Each of `schema`'s own `$defs` entries lowering has made a type for, by name.
+    pub(super) fn reached(&self, schema: &Value) -> Vec<(String, Ty)> {
+        let found = def_names(schema).into_iter().filter_map(|name| {
+            let target = Value::String(references::def_ref(&name));
+            let t = references::resolve(self, &name, &target).ok()?;
+            let ty = self.lowered.get(&t.key)?.clone();
+            Some((name, ty))
+        });
+        found.collect()
+    }
+}
+
+/// The keys of `schema`'s own `$defs`.
+fn def_names(schema: &Value) -> Vec<String> {
+    match schema.get("$defs") {
+        Some(Value::Object(defs)) => defs.keys().cloned().collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// The document a type lowers from: the schema, the definitions shared beside it, and the

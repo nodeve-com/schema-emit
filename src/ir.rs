@@ -8,8 +8,8 @@ pub struct Schema {
     pub models: Vec<Model>,
     /// What lowering holds but doesn't refuse, as a message: a mixed-kind tuple.
     pub warnings: Vec<String>,
-    /// Each `$defs` entry of a document [`crate::json_schema::lower_defs`] lowers, by name, and its
-    /// type.
+    /// Each `$defs` entry the schema reads, by name, and its type: every one where the document
+    /// has no root, else those the root reaches.
     pub named: Vec<(String, Ty)>,
 }
 

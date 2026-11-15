@@ -10,7 +10,8 @@ use crate::Error;
 /// model's fields; any other root, a scalar, list, map, or nullable, is a model of one required
 /// field named empty ([`Model::is_value`]) holding it, so a path to the value is the model's own.
 /// `#/$defs/<name>` refers to the schema's own `$defs`, else to `shared`. `notes` names the
-/// annotation keywords to carry in [`crate::ir::Notes`].
+/// annotation keywords to carry in [`crate::ir::Notes`]. [`Schema::named`] holds each of the
+/// schema's own `$defs` entries the root reaches.
 pub fn lower(
     name: &str,
     schema: &Value,
@@ -26,10 +27,18 @@ pub fn lower(
         if let Some(model) = lower.out.models.get_mut(*m) {
             model.checks = ty.checks.clone();
         }
-        return Ok((lower.finish(&[])?, *m));
+        return Ok((finish(lower, schema)?, *m));
     }
     let root = lower.model(Model::value(name, ty));
-    Ok((lower.finish(&[])?, root))
+    Ok((finish(lower, schema)?, root))
+}
+
+/// The schema `lower` holds, naming each of `schema`'s own `$defs` entries it reached.
+fn finish(lower: Lower, schema: &Value) -> Result<Schema, Error> {
+    let named = lower.reached(schema);
+    let mut out = lower.finish(&[])?;
+    out.named = named;
+    Ok(out)
 }
 
 /// A `type` list: one kind beside `null` is that kind, nullable; `null` alone is null. Two kinds

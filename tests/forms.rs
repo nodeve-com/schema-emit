@@ -4,7 +4,7 @@
 #![allow(clippy::unwrap_used)]
 
 use schema_emit::emit::std_form::{names, StdForm};
-use schema_emit::ir::Schema;
+use schema_emit::ir::{Base, Int, Schema};
 use schema_emit::json_schema::lower;
 use serde_json::{json, Map};
 
@@ -67,6 +67,35 @@ fn each_definition_lowers_once_by_name() {
     let got: Vec<&str> = s.named.iter().map(|(n, _)| n.as_str()).collect();
     assert_eq!(got, ["Part"]);
     assert_eq!(s.models.len(), 1);
+}
+
+#[test]
+fn a_root_names_each_definition_it_reaches() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "a": { "$ref": "#/$defs/Part" },
+            "n": { "$ref": "#/$defs/Count" },
+            "b": { "type": "integer" }
+        },
+        "anyOf": [{ "$ref": "#/$defs/HasB" }, { "required": ["a"] }],
+        "$defs": {
+            "Part": { "type": "object", "properties": { "x": { "type": "integer" } } },
+            "Count": { "type": "integer", "minimum": 0 },
+            "HasB": { "required": ["b"] },
+            "Unused": { "type": "string" }
+        }
+    });
+    let (s, _) = lower("Root", &schema, &Map::new(), &[]).unwrap();
+    let named: Vec<(&str, &Base)> = s.named.iter().map(|(n, t)| (n.as_str(), &t.base)).collect();
+    let part = s.models.iter().position(|m| m.name == "Part").unwrap();
+    assert_eq!(
+        named,
+        [
+            ("Part", &Base::Model(part)),
+            ("Count", &Base::Int(Int::I64))
+        ]
+    );
 }
 
 #[test]
