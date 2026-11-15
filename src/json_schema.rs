@@ -13,6 +13,7 @@ mod choices;
 mod combine;
 mod defaults;
 mod defs;
+mod join;
 mod lists;
 mod models;
 mod negate;
@@ -26,7 +27,8 @@ mod tuples;
 mod unevaluated;
 mod unions;
 
-pub use defs::{lower_defs, lower_ty, Document};
+pub use defs::{defs, lower_defs, lower_ty, Document};
+pub use join::join;
 pub use others::branch_names;
 pub use root::lower;
 

@@ -40,6 +40,15 @@ impl Lower {
     }
 }
 
+/// `document`'s own definitions by name, empty where it has none: what [`lower`](super::lower)'s
+/// `shared` argument takes.
+pub fn defs(document: &Value) -> Map<String, Value> {
+    match document.get("$defs") {
+        Some(Value::Object(defs)) => defs.clone(),
+        _ => Map::new(),
+    }
+}
+
 /// The keys of `schema`'s own `$defs`.
 fn def_names(schema: &Value) -> Vec<String> {
     match schema.get("$defs") {
