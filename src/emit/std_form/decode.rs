@@ -6,7 +6,7 @@
 //! decodes in `decode/union.rs`.
 //!
 //! A model reads each entry into its field's slot; a repeated key replaces it. A required field
-//! that fails or is absent fails the model at once. An optional field that fails is absent and
+//! that fails or is absent fails the model at once, but one the program fills later may be absent. An optional field that fails is absent and
 //! a skip (`Skips`), which `decode_<name>` returns beside the value. A key no field names fails a
 //! closed model, goes to the field of keys no field names if a check reads
 //! them, and is kept as text otherwise if the model is open. A model that is one value reads that value; one that is an alias has no impl, only `decode_<name>`.
@@ -138,10 +138,10 @@ impl StdForm<'_> {
     fn value_body(&self, i: usize, m: &Model) -> String {
         let names = idents::of(m);
         let mut init = String::new();
-        for (f, n) in m.fields.iter().zip(&names.fields) {
+        for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
             let seed = self.seed(&f.ty, Some(i));
             let read = format!("{}::deserialize({seed}, d)?", d("DeserializeSeed"));
-            let read = if f.held() {
+            let read = if !self.can_be_empty(i, k) {
                 read
             } else {
                 format!(
@@ -218,7 +218,7 @@ impl StdForm<'_> {
                 ),
             };
             let _ = write!(out.arms, "{slot}::Field({k}) => {arm}, ");
-            if f.required {
+            if f.required && !self.later(i, k) {
                 let _ = write!(
                     out.requires,
                     "{parts}::require::<_, __A::Error>(&f{k}, {step:?})?; "

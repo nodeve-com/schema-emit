@@ -9,6 +9,7 @@ use crate::Error;
 mod decode;
 mod defaults;
 mod derives;
+mod empty;
 mod encode;
 mod idents;
 mod paths;
@@ -33,6 +34,8 @@ pub struct StdForm<'a> {
     /// The paths of derive macros each struct and enum also derives, beyond `Debug`, `Clone`, and
     /// `PartialEq`.
     pub derive: &'a [&'a str],
+    /// Each field the program fills later, as its struct's model and the field's index.
+    empty: Vec<(usize, usize)>,
     /// The model whose item is being written, whose type parameters are in scope.
     within: Cell<Option<usize>>,
 }
@@ -66,6 +69,7 @@ impl<'a> StdForm<'a> {
             name,
             external: &local,
             derive: &[],
+            empty: Vec::new(),
             within: Cell::new(None),
         }
     }
@@ -224,12 +228,12 @@ impl<'a> StdForm<'a> {
     fn struct_fields(&self, i: usize, m: &Model) -> String {
         let names = idents::of(m);
         let mut fields = String::new();
-        for (f, name) in m.fields.iter().zip(&names.fields) {
+        for (k, (f, name)) in m.fields.iter().zip(&names.fields).enumerate() {
             let ty = self.ty(&f.ty, Some(i));
-            let ty = if f.held() {
-                ty
-            } else {
+            let ty = if self.can_be_empty(i, k) {
                 format!("::core::option::Option<{ty}>")
+            } else {
+                ty
             };
             let _ = write!(fields, "pub {name}: {ty}, ");
         }

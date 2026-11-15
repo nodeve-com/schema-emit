@@ -72,10 +72,10 @@ fn main() {
 
 /// Builds and runs the program.
 pub fn run() {
-    let (schema, defs) = lowered();
+    let schema = lowered();
     let named = |name: &str| schema.models.iter().position(|m| m.name == name).unwrap();
     let checks = [
-        (model(&defs, "Parcel"), "check_parcel"),
+        (model(&schema, "Parcel"), "check_parcel"),
         (named("BookParcel.contents"), "check_book"),
         (named("ToyParcel.contents"), "check_toy"),
     ];

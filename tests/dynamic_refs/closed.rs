@@ -47,7 +47,7 @@ fn tracked() -> Value {
 
 #[test]
 fn closed_definitions_over_allof_lower_alike_as_the_root_and_as_an_embedded_resource() {
-    let root = lower_defs(&tracked(), &Map::new(), &[]).unwrap().0;
+    let root = lower_defs(&tracked(), &Map::new(), &[]).unwrap();
     let book = filler(
         "book-parcel",
         json!({ "address": anchor("address", json!({
@@ -56,7 +56,7 @@ fn closed_definitions_over_allof_lower_alike_as_the_root_and_as_an_embedded_reso
     );
     let document = json!({ "$id": "https://example.test/root",
         "$defs": { "Parcel": tracked(), "BookParcel": book } });
-    let (s, defs) = lower_defs(&document, &Map::new(), &[]).unwrap();
+    let s = lower_defs(&document, &Map::new(), &[]).unwrap();
     let items = items(&s);
     assert!(items.contains("pub type BookParcel"), "{items}");
     let find = |s: &Schema, name: &str| s.models.iter().position(|m| m.name == name).unwrap();
@@ -71,6 +71,6 @@ fn closed_definitions_over_allof_lower_alike_as_the_root_and_as_an_embedded_reso
                 .replace("Value_", "Value")
         );
     }
-    let wrap = check(&s, model(&defs, "Parcel")).unwrap();
+    let wrap = check(&s, model(&s, "Parcel")).unwrap();
     assert!(wrap.contains("Parcel.wrap"), "{wrap}");
 }

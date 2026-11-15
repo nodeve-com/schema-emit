@@ -1,5 +1,5 @@
 //! Area: optionality. A field the embedder reads as present checks its value; one absent fails
-//! `absent` where required, and is silence where not.
+//! `absent` where required, and is silence where not or where the program fills it later.
 
 use super::Walk;
 use crate::Error;
@@ -20,7 +20,7 @@ impl Walk<'_, '_> {
             .ok_or_else(|| Error::invalid(format!("model {model}: no field {index}")))?;
         let x = self.at.local("f");
         let body = self.value(&x, &f.ty)?;
-        let absent = if f.required {
+        let absent = if f.required && !self.e.std.later(model, index) {
             self.at.fail("Absent")
         } else {
             String::new()

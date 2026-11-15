@@ -39,14 +39,14 @@ fn module(name: &str, items: &str) -> String {
 /// The source of module `a`, holding the model, and of module `b`, filling it.
 fn sources() -> (String, String) {
     let alone = json!({ "$id": "https://example.test/root", "$defs": { "Parcel": parcel() } });
-    let (held, defs) = lower_defs(&alone, &Map::new(), &[]).unwrap();
+    let held = lower_defs(&alone, &Map::new(), &[]).unwrap();
     let a = source(
         &held,
         &|_| None,
-        &[(model(&defs, "Parcel"), "check_parcel")],
+        &[(model(&held, "Parcel"), "check_parcel")],
     )
     .unwrap();
-    let (schema, _) = lowered();
+    let schema = lowered();
     let theirs = |m: &schema_emit::ir::Model| {
         let held = held.models.iter().any(|h| h.name == m.name);
         held.then(|| "super::a".to_string())

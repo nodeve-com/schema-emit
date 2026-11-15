@@ -8,6 +8,9 @@ pub struct Schema {
     pub models: Vec<Model>,
     /// What lowering holds but doesn't refuse, as a message: a mixed-kind tuple.
     pub warnings: Vec<String>,
+    /// Each `$defs` entry of a document [`crate::json_schema::lower_defs`] lowers, by name, and its
+    /// type.
+    pub named: Vec<(String, Ty)>,
 }
 
 /// An object of named fields, in order.
@@ -27,7 +30,8 @@ pub struct Model {
     /// The parts the model leaves open, in name order: its own fields', and those of each model
     /// with dynamic references a field holds, which takes this model's dynamic reference of the same name.
     pub dynamic_refs: Vec<DynamicRef>,
-    /// The model this one is, its dynamic references filled. Such a model has no field of its own.
+    /// The model this one is, its dynamic references filled. Such a model has no field of its own,
+    /// except in [`Schema::filled`], which gives it that model's fields filled.
     pub of: Option<Filled>,
 }
 
@@ -58,15 +62,9 @@ impl Model {
 pub struct Field {
     pub name: String,
     pub ty: Ty,
-    /// Absent fails the check; else absent is silence.
+    /// The schema requires the field: absent fails the check, unless the program fills it later
+    /// ([`crate::emit::std_form::StdForm::with_empty`]). Else absent is silence.
     pub required: bool,
-}
-
-impl Field {
-    /// Whether a value always holds this field: it is required, or its type has a default.
-    pub fn held(&self) -> bool {
-        self.required || self.ty.default.is_some()
-    }
 }
 
 /// A type: its base, the checks on a value of it, and what it carries beside the check.
@@ -283,6 +281,7 @@ pub enum Count {
 }
 
 mod dynamic_refs;
+mod filled;
 mod values;
 mod widths;
 

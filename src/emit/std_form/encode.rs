@@ -40,7 +40,7 @@ impl StdForm<'_> {
             out.push_str(
                 &self.inside(i, || match (self.is_alias(i), m.fields.first()) {
                     (true, Some(f)) => self.alias_encoder(i, &f.ty),
-                    _ => self.encoder(&self.model_path(i), &self.encode_body(m)),
+                    _ => self.encoder(&self.model_path(i), &self.encode_body(i, m)),
                 }),
             );
         }
@@ -74,11 +74,13 @@ impl StdForm<'_> {
     }
 
     /// The body of the `Serialize` impl of model `m`.
-    fn encode_body(&self, m: &Model) -> String {
+    fn encode_body(&self, i: usize, m: &Model) -> String {
         let names = idents::of(m);
         if m.is_value() {
             return match (m.fields.first(), names.fields.first()) {
-                (Some(f), Some(n)) if f.held() => self.written(&format!("&self.{n}"), &f.ty),
+                (Some(f), Some(n)) if !self.can_be_empty(i, 0) => {
+                    self.written(&format!("&self.{n}"), &f.ty)
+                }
                 (Some(f), Some(n)) => format!(
                     "match &self.{n} {{ Some(v) => {}, None => s.serialize_none() }}",
                     self.written("v", &f.ty)
@@ -88,9 +90,9 @@ impl StdForm<'_> {
         }
         let mut out = format!(
             "if !s.is_human_readable() {{ {} }} let mut m = s.serialize_map(None)?; ",
-            self.encode_positions(m)
+            self.encode_positions(i, m)
         );
-        for (f, n) in m.fields.iter().zip(&names.fields) {
+        for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
             let entry = |value: &str| {
                 let w = self.writer(&f.ty);
                 format!(
@@ -99,9 +101,9 @@ impl StdForm<'_> {
                     d("ser")
                 )
             };
-            match f.held() {
-                true => out.push_str(&entry(&format!("&self.{n}"))),
-                false => {
+            match self.can_be_empty(i, k) {
+                false => out.push_str(&entry(&format!("&self.{n}"))),
+                true => {
                     let _ = write!(out, "if let Some(v) = &self.{n} {{ {} }} ", entry("v"));
                 }
             }
@@ -111,7 +113,7 @@ impl StdForm<'_> {
     }
 
     /// The statements writing model `m` positionally.
-    fn encode_positions(&self, m: &Model) -> String {
+    fn encode_positions(&self, i: usize, m: &Model) -> String {
         let names = idents::of(m);
         let ser = d("ser");
         let others = match (&m.others, m.additional) {
@@ -123,9 +125,9 @@ impl StdForm<'_> {
             "let mut t = s.serialize_tuple({})?; ",
             m.fields.len().saturating_add(usize::from(others.is_some()))
         );
-        for (f, n) in m.fields.iter().zip(&names.fields) {
+        for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
             let w = self.writer(&f.ty);
-            let w = if f.held() {
+            let w = if !self.can_be_empty(i, k) {
                 w
             } else {
                 format!("{ser}::Maybe({w})")

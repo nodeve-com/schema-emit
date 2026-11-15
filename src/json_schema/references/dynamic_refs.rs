@@ -11,7 +11,7 @@
 use serde_json::{json, Map, Value};
 
 use super::recursion::noted;
-use super::{resolve, within, Target};
+use super::{def_ref, resolve, within, Target};
 use crate::ir::{Base, Model, Ty};
 use crate::json_schema::{notes, Lower};
 use crate::Error;
@@ -74,7 +74,7 @@ impl Lower {
             )));
         };
         let def = def.clone();
-        let pointer = format!("#/$defs/{}", def.replace('~', "~0").replace('/', "~1"));
+        let pointer = def_ref(&def);
         let outer = std::mem::replace(&mut self.base, home.into());
         let found = resolve(self, name, &json!(pointer));
         self.base = outer;

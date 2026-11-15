@@ -21,9 +21,9 @@ impl StdForm<'_> {
         }
         seen.push(m);
         let fields = self.schema.models.get(m).map(|m| m.fields.as_slice());
-        let ok = fields.unwrap_or_default().iter().all(|f| {
+        let ok = fields.unwrap_or_default().iter().enumerate().all(|(k, f)| {
             f.ty.nullable
-                || !f.required
+                || self.can_be_empty(m, k)
                 || match &f.ty.base {
                     Base::Union(_) | Base::Any => false,
                     Base::Model(n) => self.defaults(*n, seen),

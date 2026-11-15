@@ -10,6 +10,8 @@
 mod binary;
 #[path = "decode/defaults.rs"]
 mod defaults;
+#[path = "decode/empty.rs"]
+mod empty;
 #[path = "program/manifest.rs"]
 mod manifest;
 #[path = "decode/reserved.rs"]
@@ -23,14 +25,15 @@ mod strip;
 mod values;
 
 use schema_emit::emit::std_form::{names, StdForm};
+use schema_emit::emit::Emitter;
 use schema_emit::json_schema::lower;
 use serde_json::{json, Map, Value};
 
-/// Schema `schema` emitted as the module `name`, which the program's `check` reaches.
-/// Models take the names `names` makes, or the schema's own (a field `f_X` holds model `X`)
-/// where `exact`.
-fn module(name: &str, schema: &Value, check: &str, exact: bool) -> String {
-    let (s, _) = lower("Root", schema, &Map::new(), &[]).unwrap();
+/// Schema `schema` emitted as the module `name`, with the root's check `ok`, which the program's
+/// `check` reaches. Models take the names `names` makes, or the schema's own (a field `f_X` holds
+/// model `X`) where `exact`. The program fills each field `empty` names later.
+fn module(name: &str, schema: &Value, check: &str, (exact, empty): (bool, &[&str])) -> String {
+    let (s, root) = lower("Root", schema, &Map::new(), &[]).unwrap();
     let named = match exact {
         true => (s.models.iter())
             .map(|m| {
@@ -43,10 +46,14 @@ fn module(name: &str, schema: &Value, check: &str, exact: bool) -> String {
         false => names(&s),
     };
     let item = |i: usize| named.get(i).cloned().unwrap_or_default();
-    let items = StdForm::new(&s, &item).items().unwrap();
+    let std = StdForm::new(&s, &item).with_empty(root, empty).unwrap();
+    let items = std.items().unwrap() + &Emitter::new(&std).check(root, "ok").unwrap();
     format!(
         "mod {name} {{ #![allow(unused_imports, dead_code, non_camel_case_types, clippy::all)] \
          use ::schema_emit_runtime as __s; {items}\n\
+         fn fails(r: &Root) -> ::std::vec::Vec<::std::string::String> {{ \
+         let mut f = __s::Failures::<8>::default(); ok(r, &mut f); \
+         f.iter().map(|x| format!(\"{{x}}: {{}}\", x.reason.name())).collect() }}\n\
          fn d(t: &str) -> ::core::result::Result<Root, __s::decode::Unfit> {{ \
          __s::decode::json(t, |de| decode_root(de)).map(|r| r.0) }}\n\
          fn s(t: &str) -> ::std::vec::Vec<::std::string::String> {{ \
@@ -195,31 +202,29 @@ fn shapes() -> Value {
 #[test]
 fn the_decode_and_the_encode_follow_their_rules() {
     let mut main = String::new();
+    let none: &[&str] = &[];
     let modules = [
-        ("fields", fields(), FIELDS),
-        ("closed", closed(), CLOSED),
-        ("typed", typed(), TYPED),
-        ("shapes", shapes(), SHAPES),
-        ("stamped", binary::stamped(), binary::STAMPED),
-        ("every", binary::every(), binary::EVERY),
-        ("strip", strip::schema(), strip::CHECK),
-        ("reserved", reserved::schema(), reserved::CHECK),
-        ("alias", reserved::alias(), reserved::ALIAS),
-        ("list", values::list(), values::LIST),
-        ("map", values::map(), values::MAP),
-        ("defaults", defaults::schema(), defaults::CHECK),
-        ("root_default", defaults::root(), defaults::ROOT),
+        ("fields", fields(), FIELDS, none),
+        ("closed", closed(), CLOSED, none),
+        ("typed", typed(), TYPED, none),
+        ("shapes", shapes(), SHAPES, none),
+        ("stamped", binary::stamped(), binary::STAMPED, none),
+        ("every", binary::every(), binary::EVERY, none),
+        ("strip", strip::schema(), strip::CHECK, none),
+        ("reserved", reserved::schema(), reserved::CHECK, none),
+        ("alias", reserved::alias(), reserved::ALIAS, none),
+        ("list", values::list(), values::LIST, none),
+        ("map", values::map(), values::MAP, none),
+        ("defaults", defaults::schema(), defaults::CHECK, none),
+        ("root_default", defaults::root(), defaults::ROOT, none),
+        ("empty", empty::schema(), empty::CHECK, empty::PATHS),
     ];
-    for (name, schema, check) in &modules {
-        main.push_str(&module(
-            name,
-            schema,
-            check,
-            name.starts_with("reserved") || *name == "alias",
-        ));
+    for (name, schema, check, empty) in &modules {
+        let exact = name.starts_with("reserved") || *name == "alias";
+        main.push_str(&module(name, schema, check, (exact, empty)));
     }
     main.push_str("fn main() {\n");
-    for (name, _, _) in &modules {
+    for (name, ..) in &modules {
         main.push_str(&format!("{name}::check();\n"));
     }
     main.push_str("println!(\"ok\");\n}\n");

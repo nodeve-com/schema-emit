@@ -2,32 +2,32 @@
 
 use serde_json::{Map, Value};
 
-use super::Lower;
+use super::{references, Lower};
 use crate::ir::{Schema, Ty};
 use crate::Error;
 
-/// Lowers each of `schema`'s `$defs`, by name, into one schema: a definition another names is
-/// the same model. `notes` names the annotation keywords to carry.
+/// Lowers each of `schema`'s `$defs`, by name, into one schema, its [`Schema::named`]: a
+/// definition another names is the same model. `notes` names the annotation keywords to carry.
 pub fn lower_defs(
     schema: &Value,
     shared: &Map<String, Value>,
     notes: &[&str],
-) -> Result<(Schema, Vec<(String, Ty)>), Error> {
+) -> Result<Schema, Error> {
     let mut lower = Lower::new(Schema::default(), schema, shared, notes);
     let names: Vec<String> = match schema.get("$defs") {
         Some(Value::Object(defs)) => defs.keys().cloned().collect(),
         _ => Vec::new(),
     };
-    let mut out = Vec::new();
+    let mut named = Vec::new();
     for name in names {
-        let ty = lower.ty(
-            &name,
-            &serde_json::json!({ "$ref": format!("#/$defs/{name}") }),
-        )?;
-        out.push((name, ty));
+        let target = serde_json::json!({ "$ref": references::def_ref(&name) });
+        let ty = lower.ty(&name, &target)?;
+        named.push((name, ty));
     }
-    let tys: Vec<&Ty> = out.iter().map(|(_, ty)| ty).collect();
-    Ok((lower.finish(&tys)?, out))
+    let tys: Vec<&Ty> = named.iter().map(|(_, ty)| ty).collect();
+    let mut out = lower.finish(&tys)?;
+    out.named = named;
+    Ok(out)
 }
 
 /// The document a type lowers from: the schema, the definitions shared beside it, and the

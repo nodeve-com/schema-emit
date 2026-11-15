@@ -8,7 +8,7 @@
 //! one field named empty ([`Model::is_value`]), so the type refers to itself through a model and
 //! the emitter checks it by a call ([`crate::emit`]).
 
-use percent_encoding::percent_decode_str;
+use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use serde_json::{Map, Value};
 
 use super::notes;
@@ -38,6 +38,21 @@ pub(super) struct Target {
     pub schema: Value,
     /// The base URI around the schema, before its own `$id`.
     pub base: String,
+}
+
+/// What a URI fragment escapes: what may not stand in one, and `%`.
+const FRAGMENT: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'%')
+    .add(b'<')
+    .add(b'>')
+    .add(b'`');
+
+/// The `$ref` naming `$defs` entry `name` of its resource.
+pub(super) fn def_ref(name: &str) -> String {
+    let token = name.replace('~', "~0").replace('/', "~1");
+    format!("#/$defs/{}", utf8_percent_encode(&token, FRAGMENT))
 }
 
 /// The schema at JSON Pointer `pointer` below `schema`, whose base is `inner`, with the base

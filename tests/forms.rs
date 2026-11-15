@@ -63,8 +63,8 @@ fn an_external_model_is_read_through_its_module() {
 
 #[test]
 fn each_definition_lowers_once_by_name() {
-    let (s, defs) = schema_emit::json_schema::lower_defs(&schema(), &Map::new(), &[]).unwrap();
-    let got: Vec<&str> = defs.iter().map(|(n, _)| n.as_str()).collect();
+    let s = schema_emit::json_schema::lower_defs(&schema(), &Map::new(), &[]).unwrap();
+    let got: Vec<&str> = s.named.iter().map(|(n, _)| n.as_str()).collect();
     assert_eq!(got, ["Part"]);
     assert_eq!(s.models.len(), 1);
 }
@@ -83,7 +83,7 @@ fn an_allof_over_a_definition_leaves_the_definition_as_it_is() {
             }
         }
     });
-    let (s, _) = schema_emit::json_schema::lower_defs(&schema, &Map::new(), &[]).unwrap();
+    let s = schema_emit::json_schema::lower_defs(&schema, &Map::new(), &[]).unwrap();
     let items = items(&s);
     assert!(
         items.contains("pub struct Fields { pub kind: ::std::string::String, pub others: ::std::string::String, }"),

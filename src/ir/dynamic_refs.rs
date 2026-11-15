@@ -1,6 +1,6 @@
 //! Dynamic references: the parts a model leaves open, and a model that fills them.
 
-use super::{Base, Check, Model, Schema, Ty};
+use super::{Base, Check, Schema, Ty};
 
 /// A part a model leaves open, by name.
 #[derive(Clone, Debug, PartialEq)]
@@ -19,29 +19,42 @@ pub struct Filled {
     pub with: Vec<Ty>,
 }
 
-impl Check {
-    /// The types this check holds.
-    pub fn tys(&self) -> Vec<&Ty> {
-        match self {
+/// The types check `$check` holds, each borrowed by `$borrow` (`as_ref` or `as_mut`), `$iter` the
+/// matching iteration over a list of them.
+macro_rules! held {
+    ($check:expr, $iter:ident, $borrow:ident) => {
+        match $check {
             Check::Contains { ty, .. }
             | Check::Not(ty)
             | Check::Field { ty, .. }
             | Check::Entry { ty, .. }
             | Check::Matching { ty, .. }
             | Check::Unmatched { ty, .. }
-            | Check::Names(ty) => vec![ty],
-            Check::ExactlyOne(subs) | Check::AtLeastOne(subs) => subs.iter().collect(),
+            | Check::Names(ty) => vec![ty.$borrow()],
+            Check::ExactlyOne(subs) | Check::AtLeastOne(subs) => subs.$iter().collect(),
             Check::Conditional {
                 when,
                 then,
                 otherwise,
-            } => [Some(when), then.as_ref(), otherwise.as_ref()]
+            } => [Some(when), then.$borrow(), otherwise.$borrow()]
                 .into_iter()
                 .flatten()
-                .map(|t| &**t)
+                .map(|t| t.$borrow())
                 .collect(),
             _ => Vec::new(),
         }
+    };
+}
+
+impl Check {
+    /// The types this check holds.
+    pub fn tys(&self) -> Vec<&Ty> {
+        held!(self, iter, as_ref)
+    }
+
+    /// The types this check holds, to change.
+    pub fn tys_mut(&mut self) -> Vec<&mut Ty> {
+        held!(self, iter_mut, as_mut)
     }
 }
 
@@ -58,43 +71,10 @@ impl Ty {
     }
 }
 
-impl Model {
-    /// The model as a filler holds it: each field that is a dynamic reference taking the type `with` gives the
-    /// dynamic reference. A field of a model with dynamic references keeps that model, which [`Schema::filled`] fills.
-    fn with(&self, dynamic_refs: &[DynamicRef], with: &[Ty]) -> Model {
-        let mut out = self.clone();
-        for f in &mut out.fields {
-            let filled = dynamic_refs.iter().zip(with).find_map(|(s, ty)| {
-                matches!(&f.ty.base, Base::DynamicRef(n) if *n == s.name).then(|| ty.clone())
-            });
-            if let Some(ty) = filled {
-                f.ty = ty;
-            }
-        }
-        out.dynamic_refs = Vec::new();
-        out
-    }
-}
-
 impl Schema {
     /// The model `model` is: the one it fills, else itself.
     pub fn filling(&self, model: usize) -> usize {
         let of = self.models.get(model).and_then(|m| m.of.as_ref());
         of.map_or(model, |of| of.model)
-    }
-
-    /// Model `model` with every dynamic reference filled: a filler as the fields of the model it fills, each
-    /// dynamic reference's field of the filler's type, and a model with dynamic references holding each dynamic reference's own type.
-    /// `None` where the model has no dynamic reference and fills none.
-    pub fn filled(&self, model: usize) -> Option<Model> {
-        let m = self.models.get(model)?;
-        let (of, with) = match &m.of {
-            Some(f) => (self.models.get(f.model)?, f.with.clone()),
-            None if m.dynamic_refs.is_empty() => return None,
-            None => (m, m.dynamic_refs.iter().map(|s| s.ty.clone()).collect()),
-        };
-        let mut out = of.with(&of.dynamic_refs, &with);
-        out.name.clone_from(&m.name);
-        Some(out)
     }
 }

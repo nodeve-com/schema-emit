@@ -8,6 +8,8 @@
 mod closed;
 #[path = "dynamic_refs/external.rs"]
 mod external;
+#[path = "dynamic_refs/filled.rs"]
+mod filled;
 #[path = "program/manifest.rs"]
 mod manifest;
 #[path = "dynamic_refs/program.rs"]
@@ -104,14 +106,14 @@ pub fn document() -> Value {
     })
 }
 
-/// `document` lowered: the schema and each definition's type.
-pub fn lowered() -> (Schema, Vec<(String, Ty)>) {
+/// `document` lowered, each definition's type in [`Schema::named`].
+pub fn lowered() -> Schema {
     lower_defs(&document(), &Map::new(), &[]).unwrap()
 }
 
-/// The index of the model definition `name` lowers to.
-pub fn model(defs: &[(String, Ty)], name: &str) -> usize {
-    let ty = &defs.iter().find(|(n, _)| n == name).unwrap().1;
+/// The index of the model definition `name` of `s` lowers to.
+pub fn model(s: &Schema, name: &str) -> usize {
+    let ty = &s.named.iter().find(|(n, _)| n == name).unwrap().1;
     match ty.base {
         Base::Model(m) => m,
         _ => panic!("{name} is no model"),
@@ -134,8 +136,8 @@ fn check(s: &Schema, model: usize) -> Result<String, schema_emit::Error> {
 
 #[test]
 fn a_model_holds_its_dynamic_refs_and_a_filler_the_types_filling_them() {
-    let (s, defs) = lowered();
-    let parcel = model(&defs, "Parcel");
+    let s = lowered();
+    let parcel = model(&s, "Parcel");
     let refs = &s.models[parcel].dynamic_refs;
     assert_eq!(
         refs.iter().map(|r| &*r.name).collect::<Vec<_>>(),
@@ -152,7 +154,7 @@ fn a_model_holds_its_dynamic_refs_and_a_filler_the_types_filling_them() {
     let own: Vec<String> = refs.iter().map(|r| named(&r.ty)).collect();
     assert_eq!(own, ["Parcel.contents", "Parcel.label"]);
     let filled = |name: &str| {
-        let of = s.models[model(&defs, name)].of.clone().unwrap();
+        let of = s.models[model(&s, name)].of.clone().unwrap();
         assert_eq!(of.model, parcel);
         of.with.iter().map(named).collect::<Vec<_>>()
     };
@@ -164,15 +166,16 @@ fn a_model_holds_its_dynamic_refs_and_a_filler_the_types_filling_them() {
         filled("ToyParcel"),
         ["ToyParcel.contents", "ToyParcel.label"]
     );
-    let book = s.filled(model(&defs, "BookParcel")).unwrap();
+    let filled = s.filled();
+    let book = &filled.models[model(&s, "BookParcel")];
     assert_eq!(book.name, "BookParcel");
     assert_eq!(named(&book.fields[1].ty), "BookParcel.contents");
-    assert!(book.dynamic_refs.is_empty() && s.filled(model(&defs, "Sealed")).is_some());
+    assert!(book.dynamic_refs.is_empty() && filled.filling(model(&s, "BookParcel")) == parcel);
 }
 
 #[test]
 fn a_model_with_dynamic_refs_is_one_generic_struct_and_a_filler_an_alias() {
-    let (s, _) = lowered();
+    let s = lowered();
     let items = items(&s);
     for part in [
         "pub struct ParcelLabel { pub value: ::any_value::Value, }",
@@ -203,10 +206,10 @@ fn a_model_with_dynamic_refs_is_one_generic_struct_and_a_filler_an_alias() {
 
 #[test]
 fn a_generic_struct_written_elsewhere_is_filled_through_its_module() {
-    let (s, defs) = lowered();
+    let s = lowered();
     let named = names(&s);
     let name = |i: usize| named.get(i).cloned().unwrap_or_default();
-    let parcel = model(&defs, "Parcel");
+    let parcel = model(&s, "Parcel");
     let external = |i: usize| (i == parcel).then(|| "::other".to_string());
     let std = StdForm::new(&s, &name).with_external(&external);
     let items = std.items().unwrap();
@@ -222,14 +225,14 @@ fn a_generic_struct_written_elsewhere_is_filled_through_its_module() {
 
 #[test]
 fn a_check_takes_each_dynamic_refs_own_and_a_filler_has_none() {
-    let (s, defs) = lowered();
-    let check = check(&s, model(&defs, "Parcel")).unwrap();
+    let s = lowered();
+    let check = check(&s, model(&s, "Parcel")).unwrap();
     assert!(
         check.contains("pub fn ok<Contents, Label, __R: __s::Report>(v: &Parcel<Contents, Label>, r: &mut __R, param_contents: impl Fn(&Contents, &mut __R), param_label: impl Fn(&Label, &mut __R))"),
         "{check}"
     );
     assert_eq!(check.matches("param_contents(").count(), 3, "{check}");
-    let err = crate::check(&s, model(&defs, "BookParcel")).unwrap_err();
+    let err = crate::check(&s, model(&s, "BookParcel")).unwrap_err();
     assert!(!err.unsupported && err.message.contains("fills"), "{err}");
 }
 
@@ -239,9 +242,9 @@ fn a_model_with_dynamic_refs_held_from_another_resource_holds_each_dynamic_refs_
     document["$defs"]["Shelf"] = json!({ "$id": "shelf", "type": "object",
         "properties": { "first": { "$ref": "parcel" }, "all": { "type": "array", "items": { "$ref": "book-parcel" } } }
     });
-    let (s, defs) = lower_defs(&document, &Map::new(), &[]).unwrap();
-    assert!(s.models[model(&defs, "Shelf")].dynamic_refs.is_empty());
-    let check = check(&s, model(&defs, "Shelf")).unwrap();
+    let s = lower_defs(&document, &Map::new(), &[]).unwrap();
+    assert!(s.models[model(&s, "Shelf")].dynamic_refs.is_empty());
+    let check = check(&s, model(&s, "Shelf")).unwrap();
     assert!(
         check.contains("\"Shelf.all[].contents.title\"") && !check.contains("param_"),
         "{check}"
