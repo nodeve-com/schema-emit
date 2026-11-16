@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/nodeve-com/schema-emit/compare/schema-emit-v0.7.0...schema-emit-v0.7.1) - 2026-11-16
+
+### Fixed
+
+- a dynamic reference filled with a type that is no object holds the type itself
+
+### Other
+
+- a type parameter holds the filling schema's type, and its four functions
+
 ## [0.7.0](https://github.com/nodeve-com/schema-emit/compare/schema-emit-v0.6.2...schema-emit-v0.7.0) - 2026-11-15
 
 ### Other
