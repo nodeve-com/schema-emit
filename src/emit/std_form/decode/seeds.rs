@@ -20,7 +20,7 @@ enum Place {
 impl StdForm<'_> {
     /// The seed of `ty`, a field of model `owner` where it is one, which boxes a model that holds
     /// `owner`.
-    pub(super) fn seed(&self, ty: &Ty, owner: Option<usize>) -> String {
+    pub(in crate::emit::std_form) fn seed(&self, ty: &Ty, owner: Option<usize>) -> String {
         let base = self.seed_base(ty, owner);
         match ty.nullable {
             true => format!("{}({base})", d("nullable")),

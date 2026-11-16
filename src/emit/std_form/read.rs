@@ -6,8 +6,11 @@ use crate::ir::Ty;
 use crate::Error;
 
 impl StdForm<'_> {
-    /// The Rust type of a value of `ty`: an `Option` of its base where it is nullable.
-    pub(crate) fn rust(&self, ty: &Ty) -> String {
+    /// The Rust type of a value of `ty`, as text: an `Option` of its base where it is nullable.
+    /// It is the type apart from any model. A struct's field adds a `Box` where the type holds
+    /// that struct, and an `Option` where the field can be absent. A dynamic reference is its
+    /// type parameter, which only its model's own items declare.
+    pub fn rust(&self, ty: &Ty) -> String {
         self.ty(ty, None)
     }
 

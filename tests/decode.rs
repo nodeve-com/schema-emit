@@ -21,6 +21,8 @@ mod reserved;
 mod run;
 #[path = "decode/strip.rs"]
 mod strip;
+#[path = "decode/tuples.rs"]
+mod tuples;
 #[path = "decode/values.rs"]
 mod values;
 
@@ -203,6 +205,7 @@ fn shapes() -> Value {
 fn the_decode_and_the_encode_follow_their_rules() {
     let mut main = String::new();
     let none: &[&str] = &[];
+    let tuples = tuples::check();
     let modules = [
         ("fields", fields(), FIELDS, none),
         ("closed", closed(), CLOSED, none),
@@ -215,6 +218,7 @@ fn the_decode_and_the_encode_follow_their_rules() {
         ("alias", reserved::alias(), reserved::ALIAS, none),
         ("list", values::list(), values::LIST, none),
         ("map", values::map(), values::MAP, none),
+        ("tuples", tuples::schema(), &tuples, none),
         ("defaults", defaults::schema(), defaults::CHECK, none),
         ("root_default", defaults::root(), defaults::ROOT, none),
         ("empty", empty::schema(), empty::CHECK, empty::PATHS),

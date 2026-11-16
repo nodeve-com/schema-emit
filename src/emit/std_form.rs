@@ -19,6 +19,7 @@ mod source;
 mod type_params;
 mod types;
 mod unions;
+mod values;
 
 pub use idents::fields;
 pub use source::source;

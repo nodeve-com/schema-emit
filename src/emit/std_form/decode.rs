@@ -109,19 +109,7 @@ impl StdForm<'_> {
         let (name, id, slots) = (self.model_path(i), self.decoder_id(i), self.de_generics());
         let (de, deser) = (d("Deserialize"), d("Deserializer"));
         if let (true, Some(f)) = (self.is_alias(i), m.fields.first()) {
-            let seed = format!(
-                "{}::deserialize({}, d)",
-                d("DeserializeSeed"),
-                self.seed(&f.ty, None)
-            );
-            return format!(
-                "#[allow(dead_code)] pub fn decode_{id}<'de, __D: {deser}<'de>>(d: __D) \
-                 -> ::core::result::Result<({name}, {}), {}> {{ {}(|| {seed}, {:?}) }}\n",
-                d("Skips"),
-                d("Unfit"),
-                d("root"),
-                m.name,
-            );
+            return self.value_decoder(&format!("decode_{id}"), &name, &f.ty, &m.name);
         }
         let body = match m.is_value() {
             true => self.value_body(i, m),

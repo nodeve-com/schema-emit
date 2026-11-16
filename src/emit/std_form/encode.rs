@@ -43,7 +43,10 @@ impl StdForm<'_> {
             }
             out.push_str(
                 &self.inside(i, || match (self.is_alias(i), m.fields.first()) {
-                    (true, Some(f)) => self.alias_encoder(i, &f.ty),
+                    (true, Some(f)) => {
+                        let name = format!("encode_{}", self.decoder_id(i));
+                        self.value_encoder(&name, &self.model_name(i), &f.ty)
+                    }
                     _ => self.encoder(&self.model_path(i), &self.encode_body(i, m, "self")),
                 }),
             );
@@ -61,19 +64,6 @@ impl StdForm<'_> {
             self.generics(&ser, ("<", ">")),
             d("SerializeMap"),
             d("SerializeTuple"),
-        )
-    }
-
-    /// `encode_<name>` of alias model `i`, whose value of type `ty` has no `Serialize` impl to hold
-    /// the code.
-    fn alias_encoder(&self, i: usize, ty: &Ty) -> String {
-        let (ser, serializer) = (d("Serialize"), d("Serializer"));
-        format!(
-            "#[allow(dead_code, unused_imports)] pub fn encode_{}<__S: {serializer}>(v: &{}, s: __S) \
-             -> ::core::result::Result<__S::Ok, __S::Error> {{ use {ser} as _; {} }}\n",
-            self.decoder_id(i),
-            self.model_name(i),
-            self.written("v", ty),
         )
     }
 
@@ -167,7 +157,7 @@ impl StdForm<'_> {
     }
 
     /// An expression serializing the value `x` of type `ty` to `s`.
-    fn written(&self, x: &str, ty: &Ty) -> String {
+    pub(super) fn written(&self, x: &str, ty: &Ty) -> String {
         format!("{}::With({x}, {}).serialize(s)", d("ser"), self.writer(ty))
     }
 
