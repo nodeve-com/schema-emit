@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2](https://github.com/nodeve-com/schema-emit/compare/schema-emit-v0.7.1...schema-emit-v0.7.2) - 2026-11-16
+
+### Other
+
+- a value's type and its Rust text travel as one argument
+- decode_value and encode_value
+- rust, decode_value and encode_value, a type's text, reader and writer apart from any model
+
 ## [0.7.1](https://github.com/nodeve-com/schema-emit/compare/schema-emit-v0.7.0...schema-emit-v0.7.1) - 2026-11-16
 
 ### Fixed
