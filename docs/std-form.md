@@ -26,7 +26,16 @@ A model can leave a part open for each schema using it to fill, as a Rust struct
 
 The model is one generic struct, a type parameter per dynamic anchor in name order, each defaulting to the model's own anchor. A schema filling the type parameters gets an alias: that struct holding its own types. schema-emit writes the struct's serde impls, its `decode_<name>`, and its checks once, each calling a type parameter's own.
 
-A type parameter holds a struct of its own, named from its schema and the `$defs` key: an object's, else a struct of the one field `value`. The struct's check takes a function per type parameter after the report, in name order, checking a value of it. A failure inside names that struct first. A schema filling the type parameters has no check of its own.
+A type parameter holds the filling schema's type. An object is a struct of its own, named from its schema and the `$defs` key. Any other type is itself: a number is `f64`, a list a `Vec`. The model's own anchor is always a struct: an object's, else a struct of the one field `value`.
+
+The generic struct's serde impls read and write a type parameter by its own serde impl, which only a struct written here has. So a schema filling a type parameter with a type that is no struct gets four functions instead, as an alias does:
+
+- **`decode_<name>` and `encode_<name>(&value, serializer)`** read and write the filled struct, the type parameter as a field of that type reads and writes.
+- **`seed_<name>()` and `writer_<name>()`** give the same reading as a serde seed and the same writing as a schema-emit-runtime writer. A struct holding the filled struct reads and writes it through them.
+
+Never read or write such a struct by its serde impl: Rust offers the generic one, which takes the type's own serde form. `StdForm::is_bare` tells such a schema. One [written elsewhere](StdForm::with_external) has its four functions in that module.
+
+The struct's check takes a function per type parameter after the report, in name order, checking a value of it. A failure inside a struct names that struct first. `Emitter::check_value` writes the function for a type that is no struct. A schema filling the type parameters has no check of its own.
 
 The model and each schema filling it sit in one document, each under its own `$id`. The generic struct may be one [written elsewhere](StdForm::with_external), so many documents share it.
 
