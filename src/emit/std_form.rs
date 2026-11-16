@@ -11,6 +11,7 @@ mod defaults;
 mod derives;
 mod empty;
 mod encode;
+mod filling;
 mod idents;
 mod paths;
 mod read;
@@ -38,6 +39,9 @@ pub struct StdForm<'a> {
     empty: Vec<(usize, usize)>,
     /// The model whose item is being written, whose type parameters are in scope.
     within: Cell<Option<usize>>,
+    /// The model whose reading or writing is being written with its own types where the model
+    /// it fills has type parameters.
+    filling: Cell<Option<usize>>,
 }
 
 /// No model written elsewhere.
@@ -71,6 +75,7 @@ impl<'a> StdForm<'a> {
             derive: &[],
             empty: Vec::new(),
             within: Cell::new(None),
+            filling: Cell::new(None),
         }
     }
 
@@ -105,7 +110,10 @@ impl<'a> StdForm<'a> {
                 self.ty(item, None)
             ),
             Base::Union(u) => self.union_ty(u, owner),
-            Base::DynamicRef(anchor) => self.param(anchor),
+            Base::DynamicRef(anchor) => match self.filled_as(anchor) {
+                Some(ty) => self.ty(&ty, None),
+                None => self.param(anchor),
+            },
             Base::Model(m) => match owner {
                 Some(o) if self.holds(*m, o) => {
                     format!("::std::boxed::Box<{}>", self.model_path(*m))

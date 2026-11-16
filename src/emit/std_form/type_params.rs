@@ -7,7 +7,7 @@
 use std::fmt::Write as _;
 
 use super::{idents, unions, StdForm};
-use crate::ir::{Base, DynamicRef, Model};
+use crate::ir::{Base, DynamicRef, Model, Ty};
 
 impl StdForm<'_> {
     /// `f`, writing an item of model `model`: its type parameters are in scope.
@@ -39,12 +39,14 @@ impl StdForm<'_> {
         let dynamic_refs = self.schema.models.get(m).map(|m| m.dynamic_refs.as_slice());
         let dynamic_refs = dynamic_refs.unwrap_or_default();
         let scope = self.scope();
-        let shared = |s: &DynamicRef| scope.iter().any(|o| o.name == s.name);
+        let shared = |s: &DynamicRef| {
+            scope.iter().any(|o| o.name == s.name) || self.filled_as(&s.name).is_some()
+        };
         if !dynamic_refs.iter().any(shared) {
             return String::new();
         }
         let args = dynamic_refs.iter().map(|s| match shared(s) {
-            true => self.param(&s.name),
+            true => self.ty(&Ty::of(Base::DynamicRef(s.name.clone())), None),
             false => self.ty(&s.ty, None),
         });
         format!("<{}>", args.collect::<Vec<_>>().join(", "))

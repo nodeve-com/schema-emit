@@ -29,16 +29,21 @@ fn main() {
     });
     assert_eq!(absent.unwrap_err().to_string(), "Parcel.contents.title: a required field is absent");
 
-    let (toy, _): (ToyParcel, _) =
-        __s::decode::json(r#"{"id":"t","contents":{"pieces":0},"label":"red"}"#, |d| decode_parcel(d)).unwrap();
-    assert_eq!(toy.label.as_ref().map(|l| l.value.as_str()), Some("red"));
+    let text = r#"{"id":"t","contents":{"pieces":0},"label":"red","wrap":{"inner":{"pieces":4}}}"#;
+    let (toy, _) = __s::decode::json(text, |d| decode_toy_parcel(d)).unwrap();
+    assert_eq!(toy.label.as_deref(), Some("red"));
     assert_eq!(toy.contents.pieces, 0);
-    let bytes = ::postcard::to_allocvec(&toy).unwrap();
-    assert_eq!(::postcard::from_bytes::<ToyParcel>(&bytes).unwrap(), toy);
-    let (skipped, skips): (ToyParcel, _) =
-        __s::decode::json(r#"{"id":"t","contents":{"pieces":2},"label":7}"#, |d| decode_parcel(d)).unwrap();
+    assert_eq!(toy.wrap.as_ref().unwrap().inner.as_ref().unwrap().pieces, 4);
+    let mut out = Vec::new();
+    encode_toy_parcel(&toy, &mut ::serde_json::Serializer::new(&mut out)).unwrap();
+    assert_eq!(String::from_utf8(out).unwrap(), text);
+    let bytes = ::postcard::to_allocvec(&__s::decode::ser::With(&toy, writer_toy_parcel())).unwrap();
+    let mut de = ::postcard::Deserializer::from_bytes(&bytes);
+    assert_eq!(decode_toy_parcel(&mut de).unwrap().0, toy);
+    let (skipped, skips) =
+        __s::decode::json(r#"{"id":"t","contents":{"pieces":2},"label":7}"#, |d| decode_toy_parcel(d)).unwrap();
     assert_eq!(skipped.label, None);
-    assert_eq!(skips.kept[0].to_string(), "Parcel.label: expected text");
+    assert_eq!(skips.kept[0].to_string(), "ToyParcel.label: expected text");
 
     let (plain, _): (Parcel, _) =
         __s::decode::json(r#"{"id":"p","contents":{"anything":1}}"#, |d| decode_parcel(d)).unwrap();
@@ -57,12 +62,11 @@ fn main() {
     check_parcel(&book, &mut f, check_book, |_, _| {});
     assert!(f.is_empty());
 
-    let (note, _): (SealedNote, _) =
-        __s::decode::json(r#"{"kind":"k","extra":"e"}"#, |d| decode_sealed(d)).unwrap();
-    assert_eq!(note.extra.as_ref().map(|e| e.value.as_str()), Some("e"));
-    assert_eq!(::serde_json::to_string(&note).unwrap(), r#"{"kind":"k","extra":"e"}"#);
-    let bytes = ::postcard::to_allocvec(&note).unwrap();
-    assert_eq!(::postcard::from_bytes::<SealedNote>(&bytes).unwrap(), note);
+    let (note, _) =
+        __s::decode::json(r#"{"kind":"k","extra":"e"}"#, |d| decode_sealed_note(d)).unwrap();
+    assert_eq!(note.extra.as_deref(), Some("e"));
+    let written = ::serde_json::to_string(&__s::decode::ser::With(&note, writer_sealed_note()));
+    assert_eq!(written.unwrap(), r#"{"kind":"k","extra":"e"}"#);
     let (any, _): (Sealed, _) =
         __s::decode::json(r#"{"kind":"k","extra":{"n":[1,null]}}"#, |d| decode_sealed(d)).unwrap();
     assert_eq!(::serde_json::to_string(&any).unwrap(), r#"{"kind":"k","extra":{"n":[1,null]}}"#);

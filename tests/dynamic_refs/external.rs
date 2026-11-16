@@ -3,8 +3,9 @@
 //! structs marked as `a`'s. `b` writes only the dynamic reference types, their checks, and the aliases.
 
 use schema_emit::emit::std_form::source;
+use schema_emit::ir::{Model, Schema};
 use schema_emit::json_schema::lower_defs;
-use serde_json::{json, Map};
+use serde_json::{json, Map, Value};
 
 use crate::{lowered, model, parcel, run};
 
@@ -29,28 +30,33 @@ fn main() {
 "##;
 
 /// A module named `name` holding `items`.
-fn module(name: &str, items: &str) -> String {
+pub fn module(name: &str, items: &str) -> String {
     format!(
         "mod {name} {{ #![allow(unused_imports, dead_code, clippy::all)] \
          use ::schema_emit_runtime as __s;\n{items}}}\n"
     )
 }
 
+/// Module `a`'s path where `held`, the schema it holds, has model `m`.
+pub fn theirs(held: &Schema, m: &Model) -> Option<String> {
+    let held = held.models.iter().any(|h| h.name == m.name);
+    held.then(|| "super::a".to_string())
+}
+
+/// A document holding `schema` alone under `name`, lowered, and its source with the check
+/// `check` of that model.
+pub fn alone(name: &str, schema: Value, check: &str) -> (Schema, String) {
+    let alone = json!({ "$id": "https://example.test/root", "$defs": { name: schema } });
+    let held = lower_defs(&alone, &Map::new(), &[]).unwrap();
+    let a = source(&held, &|_| None, &[(model(&held, name), check)]).unwrap();
+    (held, a)
+}
+
 /// The source of module `a`, holding the model, and of module `b`, filling it.
 fn sources() -> (String, String) {
-    let alone = json!({ "$id": "https://example.test/root", "$defs": { "Parcel": parcel() } });
-    let held = lower_defs(&alone, &Map::new(), &[]).unwrap();
-    let a = source(
-        &held,
-        &|_| None,
-        &[(model(&held, "Parcel"), "check_parcel")],
-    )
-    .unwrap();
+    let (held, a) = alone("Parcel", parcel(), "check_parcel");
     let schema = lowered();
-    let theirs = |m: &schema_emit::ir::Model| {
-        let held = held.models.iter().any(|h| h.name == m.name);
-        held.then(|| "super::a".to_string())
-    };
+    let theirs = |m: &Model| theirs(&held, m);
     let book = (schema.models.iter()).position(|m| m.name == "BookParcel.contents");
     let b = source(&schema, &theirs, &[(book.unwrap(), "check_book")]).unwrap();
     (a, b)

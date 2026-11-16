@@ -34,7 +34,7 @@ impl StdForm<'_> {
             let _ = write!(init, "{}: o, ", names.others);
         }
         let len = m.fields.len().saturating_add(usize::from(kept.is_some()));
-        let name = self.model_name(i);
+        let name = self.model_bare(i);
         let body = format!("{reads}Ok({name} {{ {init}}})");
         self.positions(&self.model_path(i), len, &body)
     }

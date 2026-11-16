@@ -34,13 +34,17 @@ impl StdForm<'_> {
             out.push_str(&self.encoder(&name, &format!("match self {{ {arms}}}")));
         }
         for (i, m) in self.schema.models.iter().enumerate() {
-            if (self.external)(i).is_some() || m.of.is_some() {
+            if (self.external)(i).is_some() || (m.of.is_some() && !self.is_bare(i)) {
+                continue;
+            }
+            if m.of.is_some() {
+                out.push_str(&self.filler_encoder(i, m));
                 continue;
             }
             out.push_str(
                 &self.inside(i, || match (self.is_alias(i), m.fields.first()) {
                     (true, Some(f)) => self.alias_encoder(i, &f.ty),
-                    _ => self.encoder(&self.model_path(i), &self.encode_body(i, m)),
+                    _ => self.encoder(&self.model_path(i), &self.encode_body(i, m, "self")),
                 }),
             );
         }
@@ -73,16 +77,16 @@ impl StdForm<'_> {
         )
     }
 
-    /// The body of the `Serialize` impl of model `m`.
-    fn encode_body(&self, i: usize, m: &Model) -> String {
+    /// The statements writing model `m`, the value `this`, to `s`.
+    pub(super) fn encode_body(&self, i: usize, m: &Model, this: &str) -> String {
         let names = idents::of(m);
         if m.is_value() {
             return match (m.fields.first(), names.fields.first()) {
                 (Some(f), Some(n)) if !self.can_be_empty(i, 0) => {
-                    self.written(&format!("&self.{n}"), &f.ty)
+                    self.written(&format!("&{this}.{n}"), &f.ty)
                 }
                 (Some(f), Some(n)) => format!(
-                    "match &self.{n} {{ Some(v) => {}, None => s.serialize_none() }}",
+                    "match &{this}.{n} {{ Some(v) => {}, None => s.serialize_none() }}",
                     self.written("v", &f.ty)
                 ),
                 _ => "s.serialize_none()".into(),
@@ -90,7 +94,7 @@ impl StdForm<'_> {
         }
         let mut out = format!(
             "if !s.is_human_readable() {{ {} }} let mut m = s.serialize_map(None)?; ",
-            self.encode_positions(i, m)
+            self.encode_positions(i, m, this)
         );
         for (k, (f, n)) in m.fields.iter().zip(&names.fields).enumerate() {
             let entry = |value: &str| {
@@ -102,18 +106,18 @@ impl StdForm<'_> {
                 )
             };
             match self.can_be_empty(i, k) {
-                false => out.push_str(&entry(&format!("&self.{n}"))),
+                false => out.push_str(&entry(&format!("&{this}.{n}"))),
                 true => {
-                    let _ = write!(out, "if let Some(v) = &self.{n} {{ {} }} ", entry("v"));
+                    let _ = write!(out, "if let Some(x) = &{this}.{n} {{ {} }} ", entry("x"));
                 }
             }
         }
-        out.push_str(&self.encode_others(m));
+        out.push_str(&self.encode_others(m, this));
         out + "m.end()"
     }
 
     /// The statements writing model `m` positionally.
-    fn encode_positions(&self, i: usize, m: &Model) -> String {
+    fn encode_positions(&self, i: usize, m: &Model, this: &str) -> String {
         let names = idents::of(m);
         let ser = d("ser");
         let others = match (&m.others, m.additional) {
@@ -132,12 +136,15 @@ impl StdForm<'_> {
             } else {
                 format!("{ser}::Maybe({w})")
             };
-            let _ = write!(out, "t.serialize_element(&{ser}::With(&self.{n}, {w}))?; ");
+            let _ = write!(
+                out,
+                "t.serialize_element(&{ser}::With(&{this}.{n}, {w}))?; "
+            );
         }
         if let Some(w) = others {
             let _ = write!(
                 out,
-                "t.serialize_element(&{ser}::With(&self.{}, {w}))?; ",
+                "t.serialize_element(&{ser}::With(&{this}.{}, {w}))?; ",
                 names.others
             );
         }
@@ -145,15 +152,15 @@ impl StdForm<'_> {
     }
 
     /// The code writing the keys of model `m` that no field names.
-    fn encode_others(&self, m: &Model) -> String {
+    fn encode_others(&self, m: &Model, this: &str) -> String {
         let others = idents::of(m).others;
         match (&m.others, m.additional) {
             (Some(held), _) => {
-                let entry = format!("&{}::With(v, {})", d("ser"), self.writer(held));
-                format!("for (k, v) in &self.{others} {{ m.serialize_entry(k, {entry})?; }} ")
+                let entry = format!("&{}::With(x, {})", d("ser"), self.writer(held));
+                format!("for (k, x) in &{this}.{others} {{ m.serialize_entry(k, {entry})?; }} ")
             }
             (None, Additional::Keep) => {
-                format!("{}(&mut m, &self.{others})?; ", d("members"))
+                format!("{}(&mut m, &{this}.{others})?; ", d("members"))
             }
             (None, _) => String::new(),
         }
@@ -185,6 +192,11 @@ impl StdForm<'_> {
                 );
                 format!("{ser}::Positional({})", tuple_of(&parts))
             }
+            Base::DynamicRef(anchor) => match self.filled_as(anchor) {
+                Some(ty) => self.writer(&ty),
+                None => format!("{ser}::Plain"),
+            },
+            Base::Model(m) => self.model_writer(*m),
             _ => format!("{ser}::Plain"),
         };
         match ty.nullable {

@@ -71,8 +71,13 @@ impl StdForm<'_> {
             out.push_str(&self.union_decoder(union)?);
         }
         for (i, m) in self.schema.models.iter().enumerate() {
-            if (self.external)(i).is_none() && m.of.is_none() {
-                out.push_str(&self.inside(i, || self.model_decoder(i, m)));
+            if (self.external)(i).is_some() {
+                continue;
+            }
+            match m.of {
+                Some(_) if self.is_bare(i) => out.push_str(&self.filler_decoder(i, m)),
+                Some(_) => {}
+                None => out.push_str(&self.inside(i, || self.model_decoder(i, m))),
             }
         }
         Ok(out)
@@ -160,9 +165,15 @@ impl StdForm<'_> {
         format!("Ok({} {{ {init}}})", self.model_name(i))
     }
 
-    /// The body of the impl of a model of an object: a visitor reading its entries.
+    /// The body of the impl of a model of an object: its seed reading `d`.
     fn object_body(&self, i: usize, m: &Model) -> String {
-        let (name, value) = (self.model_name(i), self.model_path(i));
+        let seed = self.object_seed(i, m);
+        format!("{}::deserialize({seed}, d)", d("DeserializeSeed"))
+    }
+
+    /// The seed of a model of an object: a visitor reading its entries.
+    pub(super) fn object_seed(&self, i: usize, m: &Model) -> String {
+        let (name, value) = (self.model_bare(i), self.model_path(i));
         let (unit, unit_ty, unit_new) = self.unit("__V");
         let (f, u) = (self.fields_code(i, m), self.unnamed(m));
         let keys: Vec<String> = m.fields.iter().map(|f| format!("{:?}", f.name)).collect();
@@ -184,17 +195,16 @@ impl StdForm<'_> {
             u.init,
         );
         format!(
-            "{unit} impl<'de{}> {}<'de> for {unit_ty} {{ type Value = {value}; \
+            "{{ {unit} impl<'de{}> {}<'de> for {unit_ty} {{ type Value = {value}; \
              const EXPECTED: &'static str = \"an object\"; \
              {} \
              #[allow(unused_mut, unused_variables)] \
              fn map<__A: {}<'de>>(self, mut m: __A) -> ::core::result::Result<{value}, __A::Error> {{ {read} }} }} \
-             {}::deserialize({}({unit_new}), d)",
+             {}({unit_new}) }}",
             self.de_generics(),
             d("Kinds"),
             self.model_positions(i, m),
             d("MapAccess"),
-            d("DeserializeSeed"),
             d("Shape"),
         )
     }

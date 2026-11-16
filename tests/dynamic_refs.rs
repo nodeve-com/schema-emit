@@ -4,6 +4,10 @@
 
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
 
+#[path = "dynamic_refs/bare.rs"]
+mod bare;
+#[path = "dynamic_refs/bare/program.rs"]
+mod bare_program;
 #[path = "dynamic_refs/closed.rs"]
 mod closed;
 #[path = "dynamic_refs/external.rs"]
@@ -162,10 +166,7 @@ fn a_model_holds_its_dynamic_refs_and_a_filler_the_types_filling_them() {
         filled("BookParcel"),
         ["BookParcel.contents", "Parcel.label"]
     );
-    assert_eq!(
-        filled("ToyParcel"),
-        ["ToyParcel.contents", "ToyParcel.label"]
-    );
+    assert_eq!(filled("ToyParcel"), ["ToyParcel.contents", "Text"]);
     let filled = s.filled();
     let book = &filled.models[model(&s, "BookParcel")];
     assert_eq!(book.name, "BookParcel");
@@ -179,14 +180,15 @@ fn a_model_with_dynamic_refs_is_one_generic_struct_and_a_filler_an_alias() {
     let items = items(&s);
     for part in [
         "pub struct ParcelLabel { pub value: ::any_value::Value, }",
-        "pub struct ToyParcelLabel { pub value: ::std::string::String, }",
         "pub struct Parcel<Contents = ParcelContents, Label = ParcelLabel> { pub id: ::std::string::String, pub contents: Contents, pub label: ::core::option::Option<Label>, pub wrap: ::core::option::Option<ParcelWrap<Contents>>, pub crate_: ::core::option::Option<Crate<Contents>>,",
         "pub struct ParcelWrap<Contents = ParcelContents> { pub inner: ::core::option::Option<Contents>,",
         "pub struct Crate<Contents = ParcelContents> { pub item: Contents,",
         "pub type BookParcel = Parcel<BookParcelContents, ParcelLabel>;",
-        "pub type ToyParcel = Parcel<ToyParcelContents, ToyParcelLabel>;",
+        "pub type ToyParcel = Parcel<ToyParcelContents, ::std::string::String>;",
         "pub struct Sealed<Extra = SealedExtra> { pub kind: ::std::string::String, pub extra: ::core::option::Option<Extra>, pub others: ::std::string::String, }",
-        "pub type SealedNote = Sealed<SealedNoteExtra>;",
+        "pub type SealedNote = Sealed<::std::string::String>;",
+        "pub fn decode_toy_parcel<'de, __D:",
+        "pub fn encode_sealed_note<__S:",
         "pub fn decode_parcel<'de, Contents: for<'__a> __s::decode::Deserialize<'__a>, Label: for<'__a> __s::decode::Deserialize<'__a>, __D:",
     ] {
         assert!(items.contains(part), "{part}\n{items}");
@@ -198,10 +200,9 @@ fn a_model_with_dynamic_refs_is_one_generic_struct_and_a_filler_an_alias() {
     ] {
         assert_eq!(items.matches(once).count(), 1, "{once}");
     }
-    assert!(
-        !items.contains("decode_book_parcel<") && !items.contains("for BookParcel "),
-        "{items}"
-    );
+    for absent in ["decode_book_parcel<", "for BookParcel ", "ToyParcelLabel"] {
+        assert!(!items.contains(absent), "{absent}");
+    }
 }
 
 #[test]

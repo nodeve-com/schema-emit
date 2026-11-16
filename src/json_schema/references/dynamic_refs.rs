@@ -66,8 +66,17 @@ impl Lower {
         Ok(Ty::of(Base::DynamicRef(dynamic_ref.into())))
     }
 
-    /// The type of the schema declaring anchor `dynamic_ref` in resource `home`.
+    /// The type a dynamic reference of resource `home` holds unfilled: its anchor `dynamic_ref`'s.
     fn anchor(&mut self, name: &str, home: &str, dynamic_ref: &str) -> Result<Ty, Error> {
+        self.anchored(name, (home, dynamic_ref), |l, n, ty| Ok(l.own_type(n, ty)))
+    }
+
+    /// The schema declaring anchor `dynamic_ref` in resource `home`, and its `$defs` key.
+    fn declaring(
+        &mut self,
+        name: &str,
+        (home, dynamic_ref): (&str, &str),
+    ) -> Result<(String, Target), Error> {
         let Some(def) = self.index.dynamic.get(&format!("{home}#{dynamic_ref}")) else {
             return Err(Error::unsupported(format!(
                 "{name}: dynamic reference `{dynamic_ref}`, which its resource declares no `$dynamicAnchor` for"
@@ -78,7 +87,18 @@ impl Lower {
         let outer = std::mem::replace(&mut self.base, home.into());
         let found = resolve(self, name, &json!(pointer));
         self.base = outer;
-        let mut t = found?;
+        Ok((def, found?))
+    }
+
+    /// The type of the schema declaring anchor `dynamic_ref` in resource `home`, as `held` makes
+    /// it from the schema's name and its lowered type.
+    fn anchored(
+        &mut self,
+        name: &str,
+        (home, dynamic_ref): (&str, &str),
+        held: fn(&mut Lower, &str, Ty) -> Result<Ty, Error>,
+    ) -> Result<Ty, Error> {
+        let (def, mut t) = self.declaring(name, (home, dynamic_ref))?;
         if let Some(ty) = self.lowered.get(&t.key) {
             return Ok(ty.clone());
         }
@@ -100,13 +120,13 @@ impl Lower {
                 "{name}: dynamic reference `{dynamic_ref}`'s own schema reaches a dynamic reference or itself"
             )));
         }
-        let ty = self.own_type(&t.name, ty);
+        let ty = held(self, &t.name, ty)?;
         self.lowered.insert(t.key, ty.clone());
         Ok(ty)
     }
 
-    /// `ty` as a type a dynamic reference holds: an object's model, else a model of the one value, named
-    /// `name`, so each has the decode, encode, and check a model with the dynamic reference calls.
+    /// `ty` as the type a dynamic reference holds unfilled: an object's model, else a model of the
+    /// one value, named `name`, so each has the decode and encode the generic struct's own call.
     fn own_type(&mut self, name: &str, ty: Ty) -> Ty {
         if matches!(ty.base, Base::Model(_)) && !ty.nullable && ty.checks.is_empty() {
             return ty;
@@ -183,7 +203,10 @@ impl Lower {
             } else {
                 home.clone()
             };
-            with.push(self.anchor(name, &from, n)?);
+            with.push(match from == home {
+                true => self.anchor(name, &from, n)?,
+                false => self.anchored(name, (&from, n), |_, n, ty| filling(n, ty))?,
+            });
         }
         let base = Base::Model(self.filled(name, model, with));
         Ok(Ty { base, ..ty })
@@ -211,6 +234,17 @@ impl Lower {
             (Base::Model(model), false, None) => Ok(Some(*model)),
             _ => Err((first.clone(), "beside a keyword that checks")),
         }
+    }
+}
+
+/// `ty`, the type of the schema named `name` filling a dynamic reference: the type itself. One
+/// that is no object's model carries no default, as no field of the filled model can hold it.
+fn filling(name: &str, ty: Ty) -> Result<Ty, Error> {
+    match ty.default {
+        Some(_) => Err(Error::unsupported(format!(
+            "{name}: `default` on a schema filling a dynamic reference"
+        ))),
+        None => Ok(ty),
     }
 }
 
