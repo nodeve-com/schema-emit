@@ -62,10 +62,14 @@ A program may fill a struct one field at a time, so a field its schema requires 
 
 `decode_<name>` takes any serde deserializer (`schema_emit_runtime::decode::json` for text) and returns `(value, skips)`. The first failing required value fails the decode, as does a key a closed model doesn't name ([extra keys](#extra-keys)). A bad optional value is absent instead, returned as a skip beside the value (schema-emit-runtime's README has which deserializers skip, and how many skips it keeps). `Unfit` names a failure's or a skip's place (`path`, as `Model.field[2].key`) and its `Why`.
 
+`StdForm::decode_value` writes the same function for one type apart from any model, such as a property's, returning the type `StdForm::rust` names. Its paths start at the path you pass.
+
 A union tries each branch on its value's text: the first whose check passes, else the first that decodes, else the one the value fit furthest.
 
 ## Encode
 
 `Serialize` skips an absent optional field, writes a union as its branch's value, and writes unread keys back. A timestamp and a duration write in any-value's text forms ([README](https://github.com/nodeve-com/any-value#timestamps-and-durations-as-text)).
+
+`StdForm::encode_value` writes a function taking a value of one type and a serializer, apart from any model. It writes the value as `Serialize` writes a field of that type.
 
 The same impls read and write a binary format such as postcard, by position (schema-emit-runtime's README has the layout).
