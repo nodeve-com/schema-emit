@@ -27,7 +27,7 @@ impl StdForm<'_> {
     /// model declares.
     pub fn decode_value(&self, ty: &Ty, path: &str, name: &str) -> Result<String, Error> {
         self.closed(ty, name)?;
-        Ok(self.value_decoder(name, &self.rust(ty), ty, path))
+        Ok(self.value_decoder(name, (ty, &self.rust(ty)), path))
     }
 
     /// `pub fn <name>`, taking a `&` of [`StdForm::rust`]'s type of `ty` and a serde serializer,
@@ -35,7 +35,7 @@ impl StdForm<'_> {
     /// what [`StdForm::decode_value`] refuses.
     pub fn encode_value(&self, ty: &Ty, name: &str) -> Result<String, Error> {
         self.closed(ty, name)?;
-        Ok(self.value_encoder(name, &self.rust(ty), ty))
+        Ok(self.value_encoder(name, (ty, &self.rust(ty))))
     }
 
     /// Refuses a function `name` of a type holding a dynamic reference.
@@ -50,7 +50,7 @@ impl StdForm<'_> {
 
     /// `pub fn <name>`, decoding a value of `ty`, the Rust type `rust`, its failures' paths from
     /// `path`.
-    pub(super) fn value_decoder(&self, name: &str, rust: &str, ty: &Ty, path: &str) -> String {
+    pub(super) fn value_decoder(&self, name: &str, (ty, rust): (&Ty, &str), path: &str) -> String {
         format!(
             "#[allow(dead_code)] pub fn {name}<'de, __D: {}<'de>>(d: __D) \
              -> ::core::result::Result<({rust}, {}), {}> {{ {}(|| {}::deserialize({}, d), {path:?}) }}\n",
@@ -64,7 +64,7 @@ impl StdForm<'_> {
     }
 
     /// `pub fn <name>`, encoding a value of `ty`, the Rust type `rust`.
-    pub(super) fn value_encoder(&self, name: &str, rust: &str, ty: &Ty) -> String {
+    pub(super) fn value_encoder(&self, name: &str, (ty, rust): (&Ty, &str)) -> String {
         let (ser, serializer) = (d("Serialize"), d("Serializer"));
         format!(
             "#[allow(dead_code, unused_imports)] pub fn {name}<__S: {serializer}>(v: &{rust}, s: __S) \

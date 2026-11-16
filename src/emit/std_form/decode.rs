@@ -109,7 +109,7 @@ impl StdForm<'_> {
         let (name, id, slots) = (self.model_path(i), self.decoder_id(i), self.de_generics());
         let (de, deser) = (d("Deserialize"), d("Deserializer"));
         if let (true, Some(f)) = (self.is_alias(i), m.fields.first()) {
-            return self.value_decoder(&format!("decode_{id}"), &name, &f.ty, &m.name);
+            return self.value_decoder(&format!("decode_{id}"), (&f.ty, &name), &m.name);
         }
         let body = match m.is_value() {
             true => self.value_body(i, m),

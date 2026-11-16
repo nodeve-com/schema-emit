@@ -45,7 +45,7 @@ impl StdForm<'_> {
                 &self.inside(i, || match (self.is_alias(i), m.fields.first()) {
                     (true, Some(f)) => {
                         let name = format!("encode_{}", self.decoder_id(i));
-                        self.value_encoder(&name, &self.model_name(i), &f.ty)
+                        self.value_encoder(&name, (&f.ty, &self.model_name(i)))
                     }
                     _ => self.encoder(&self.model_path(i), &self.encode_body(i, m, "self")),
                 }),
