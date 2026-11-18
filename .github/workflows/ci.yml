@@ -1,8 +1,8 @@
 name: ci
+# Releases are made from main, so CI checks main; a release pull request only bumps versions.
 on:
   push:
     branches: [main]
-  pull_request:
 jobs:
   check:
     runs-on: ubuntu-latest
