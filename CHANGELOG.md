@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/nodeve-com/schema-emit/compare/schema-emit-v0.7.2...schema-emit-v0.8.0) - 2026-11-18
+
+### Added
+
+- [**breaking**] Schema::named holds each shared definition the root reaches, beside the schema's own
+
 ## [0.7.2](https://github.com/nodeve-com/schema-emit/compare/schema-emit-v0.7.1...schema-emit-v0.7.2) - 2026-11-16
 
 ### Other
