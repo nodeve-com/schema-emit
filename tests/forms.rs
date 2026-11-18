@@ -273,3 +273,27 @@ fn a_struct_holding_a_default_writes_its_default_impl() {
     assert!(items.contains("Default for Root"), "{items}");
     assert!(items.contains("n: Self::default_n(), m: ::core::default::Default::default()"));
 }
+
+#[test]
+fn a_root_names_each_shared_definition_it_reaches() {
+    let shared = json!({
+        "Sample": { "type": "object", "properties": { "w": { "type": "number" } } },
+        "Peak": { "type": "object", "properties": { "w": { "type": "number" } } },
+        "Unused": { "type": "string" }
+    });
+    let shared = shared.as_object().unwrap().clone();
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "s": { "$ref": "#/$defs/Sample" },
+            "p": { "$ref": "#/$defs/Peak" }
+        }
+    });
+    let (s, _) = lower("Root", &schema, &shared, &[]).unwrap();
+    let at = |name: &str| s.models.iter().position(|m| m.name == name).unwrap();
+    let mut named: Vec<(&str, &Base)> =
+        s.named.iter().map(|(n, t)| (n.as_str(), &t.base)).collect();
+    named.sort_by_key(|(n, _)| *n);
+    let (peak, sample) = (Base::Model(at("Peak")), Base::Model(at("Sample")));
+    assert_eq!(named, [("Peak", &peak), ("Sample", &sample)]);
+}

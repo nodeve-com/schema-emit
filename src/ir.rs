@@ -9,7 +9,7 @@ pub struct Schema {
     /// What lowering holds but doesn't refuse, as a message: a mixed-kind tuple.
     pub warnings: Vec<String>,
     /// Each `$defs` entry the schema reads, by name, and its type: every one where the document
-    /// has no root, else those the root reaches.
+    /// has no root, else those the root reaches, its own or shared beside it.
     pub named: Vec<(String, Ty)>,
 }
 

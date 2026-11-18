@@ -11,7 +11,7 @@ use crate::Error;
 /// field named empty ([`Model::is_value`]) holding it, so a path to the value is the model's own.
 /// `#/$defs/<name>` refers to the schema's own `$defs`, else to `shared`. `notes` names the
 /// annotation keywords to carry in [`crate::ir::Notes`]. [`Schema::named`] holds each of the
-/// schema's own `$defs` entries the root reaches.
+/// schema's own `$defs` entries, and each of `shared`, the root reaches.
 pub fn lower(
     name: &str,
     schema: &Value,
@@ -27,15 +27,15 @@ pub fn lower(
         if let Some(model) = lower.out.models.get_mut(*m) {
             model.checks = ty.checks.clone();
         }
-        return Ok((finish(lower, schema)?, *m));
+        return Ok((finish(lower)?, *m));
     }
     let root = lower.model(Model::value(name, ty));
-    Ok((finish(lower, schema)?, root))
+    Ok((finish(lower)?, root))
 }
 
-/// The schema `lower` holds, naming each of `schema`'s own `$defs` entries it reached.
-fn finish(lower: Lower, schema: &Value) -> Result<Schema, Error> {
-    let named = lower.reached(schema);
+/// The schema `lower` holds, naming each definition it reached.
+fn finish(lower: Lower) -> Result<Schema, Error> {
+    let named = lower.reached();
     let mut out = lower.finish(&[])?;
     out.named = named;
     Ok(out)

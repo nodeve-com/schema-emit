@@ -28,9 +28,10 @@ pub fn lower_defs(
 }
 
 impl Lower {
-    /// Each of `schema`'s own `$defs` entries lowering has made a type for, by name.
-    pub(super) fn reached(&self, schema: &Value) -> Vec<(String, Ty)> {
-        let found = def_names(schema).into_iter().filter_map(|name| {
+    /// Each definition lowering has made a type for, by name: the schema's own `$defs` entries
+    /// and the shared ones beside it that it reached.
+    pub(super) fn reached(&self) -> Vec<(String, Ty)> {
+        let found = self.defs.keys().cloned().filter_map(|name| {
             let target = Value::String(references::def_ref(&name));
             let t = references::resolve(self, &name, &target).ok()?;
             let ty = self.lowered.get(&t.key)?.clone();
