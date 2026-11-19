@@ -6,7 +6,8 @@
 //! so a timestamp, a duration, and bytes keep their text forms.
 //!
 //! A format that isn't human-readable gets the positional form `decode::binary` reads: a model's
-//! fields in order, an optional one an option, then its keys no field names; a union its
+//! fields in order, an optional one an option, then its keys no field names (none, where
+//! `binary_drops_undeclared`); a union its
 //! branch's index and value; a tuple an option per position, then the list of the rest.
 
 use std::fmt::Write as _;
@@ -111,6 +112,7 @@ impl StdForm<'_> {
         let names = idents::of(m);
         let ser = d("ser");
         let others = match (&m.others, m.additional) {
+            _ if self.binary_drops_undeclared => None,
             (Some(held), _) => Some(format!("{ser}::Entries({})", self.writer(held))),
             (None, Additional::Keep) => Some(format!("{ser}::Plain")),
             (None, _) => None,

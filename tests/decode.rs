@@ -10,6 +10,8 @@
 mod binary;
 #[path = "decode/defaults.rs"]
 mod defaults;
+#[path = "decode/dropped.rs"]
+mod dropped;
 #[path = "decode/empty.rs"]
 mod empty;
 #[path = "program/manifest.rs"]
@@ -33,8 +35,14 @@ use serde_json::{json, Map, Value};
 
 /// Schema `schema` emitted as the module `name`, with the root's check `ok`, which the program's
 /// `check` reaches. Models take the names `names` makes, or the schema's own (a field `f_X` holds
-/// model `X`) where `exact`. The program fills each field `empty` names later.
-fn module(name: &str, schema: &Value, check: &str, (exact, empty): (bool, &[&str])) -> String {
+/// model `X`) where `exact`. The program fills each field `empty` names later. The binary forms
+/// drop the undeclared keys where `drops`.
+fn module(
+    name: &str,
+    schema: &Value,
+    check: &str,
+    (exact, empty, drops): (bool, &[&str], bool),
+) -> String {
     let (s, root) = lower("Root", schema, &Map::new(), &[]).unwrap();
     let named = match exact {
         true => (s.models.iter())
@@ -48,7 +56,10 @@ fn module(name: &str, schema: &Value, check: &str, (exact, empty): (bool, &[&str
         false => names(&s),
     };
     let item = |i: usize| named.get(i).cloned().unwrap_or_default();
-    let std = StdForm::new(&s, &item).with_empty(root, empty).unwrap();
+    let std = StdForm::new(&s, &item)
+        .with_binary_drops_undeclared(drops)
+        .with_empty(root, empty)
+        .unwrap();
     let items = std.items().unwrap() + &Emitter::new(&std).check(root, "ok").unwrap();
     format!(
         "mod {name} {{ #![allow(unused_imports, dead_code, non_camel_case_types, clippy::all)] \
@@ -225,7 +236,7 @@ fn the_decode_and_the_encode_follow_their_rules() {
     ];
     for (name, schema, check, empty) in &modules {
         let exact = name.starts_with("reserved") || *name == "alias";
-        main.push_str(&module(name, schema, check, (exact, empty)));
+        main.push_str(&module(name, schema, check, (exact, empty, false)));
     }
     main.push_str("fn main() {\n");
     for (name, ..) in &modules {
@@ -233,4 +244,20 @@ fn the_decode_and_the_encode_follow_their_rules() {
     }
     main.push_str("println!(\"ok\");\n}\n");
     assert_eq!(run::execute("schema-emit-decode", &main).trim(), "ok");
+}
+
+#[test]
+fn binary_forms_keep_undeclared_keys_unless_told_to_drop_them() {
+    let none: &[&str] = &[];
+    let kept = (false, none, false);
+    let mut main = module("kept", &dropped::schema(), dropped::KEPT, kept);
+    let off = (false, none, true);
+    main.push_str(&module(
+        "dropped",
+        &dropped::schema(),
+        dropped::DROPPED,
+        off,
+    ));
+    main.push_str("fn main() { kept::check(); dropped::check(); println!(\"ok\"); }\n");
+    assert_eq!(run::execute("schema-emit-dropped", &main).trim(), "ok");
 }

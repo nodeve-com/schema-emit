@@ -36,6 +36,8 @@ pub struct StdForm<'a> {
     /// The paths of derive macros each struct and enum also derives, beyond `Debug`, `Clone`, and
     /// `PartialEq`.
     pub derive: &'a [&'a str],
+    /// Whether the positional form leaves out the keys no field names.
+    pub binary_drops_undeclared: bool,
     /// Each field the program fills later, as its struct's model and the field's index.
     empty: Vec<(usize, usize)>,
     /// The model whose item is being written, whose type parameters are in scope.
@@ -74,6 +76,7 @@ impl<'a> StdForm<'a> {
             name,
             external: &local,
             derive: &[],
+            binary_drops_undeclared: false,
             empty: Vec::new(),
             within: Cell::new(None),
             filling: Cell::new(None),
@@ -88,6 +91,16 @@ impl<'a> StdForm<'a> {
     /// This form, its structs and enums also deriving `derive`.
     pub fn with_derive(self, derive: &'a [&'a str]) -> Self {
         StdForm { derive, ..self }
+    }
+
+    /// This form, its positional (non-human-readable) forms leaving out the keys no field names
+    /// where `drop` is true. The struct keeps its field of them, empty after a positional read,
+    /// and the human-readable form is unchanged.
+    pub fn with_binary_drops_undeclared(self, drop: bool) -> Self {
+        StdForm {
+            binary_drops_undeclared: drop,
+            ..self
+        }
     }
 
     /// The Rust type of a value of `ty`, in model `owner` if it is a field's, which boxes a model

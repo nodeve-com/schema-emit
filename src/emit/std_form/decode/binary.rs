@@ -25,6 +25,7 @@ impl StdForm<'_> {
             let _ = write!(init, "{n}: f{k}, ");
         }
         let kept = match (&m.others, m.additional) {
+            _ if self.binary_drops_undeclared => None,
             (Some(held), _) => Some(format!("{}({})", d("map"), self.seed(held, None))),
             (None, Additional::Keep) => Some(format!("{}()", d("text"))),
             (None, _) => None,
@@ -32,6 +33,8 @@ impl StdForm<'_> {
         if let Some(seed) = &kept {
             let _ = write!(reads, "let o = {}; ", next(seed));
             let _ = write!(init, "{}: o, ", names.others);
+        } else if self.binary_drops_undeclared {
+            init.push_str(&empty_others(m));
         }
         let len = m.fields.len().saturating_add(usize::from(kept.is_some()));
         let name = self.model_bare(i);
@@ -94,4 +97,14 @@ pub(super) fn next(seed: &str) -> String {
 /// The seed of an optional position, an option of `ty`'s.
 pub(super) fn optional(seed: &str) -> String {
     format!("{}({seed})", d("nullable"))
+}
+
+/// The initializer of model `m`'s field of keys no field names, empty, or nothing if it has none.
+pub(super) fn empty_others(m: &Model) -> String {
+    let field = idents::of(m).others;
+    match (&m.others, m.additional) {
+        (Some(_), _) => format!("{field}: ::std::vec::Vec::new(), "),
+        (None, Additional::Keep) => format!("{field}: ::std::string::String::new(), "),
+        (None, _) => String::new(),
+    }
 }

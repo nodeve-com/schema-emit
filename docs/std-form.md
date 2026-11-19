@@ -73,3 +73,5 @@ A union tries each branch on its value's text: the first whose check passes, els
 `StdForm::encode_value` writes a function taking a value of one type and a serializer, apart from any model. It writes the value as `Serialize` writes a field of that type.
 
 The same impls read and write a binary format such as postcard, by position (schema-emit-runtime's README has the layout).
+
+`StdForm::with_binary_drops_undeclared(true)` leaves the [extra keys](#extra-keys) an open model keeps out of that positional form. It writes and reads no position for them, and a binary read leaves the struct's field of them empty. The human-readable form does not change. The option starts off.

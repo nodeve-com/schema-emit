@@ -145,11 +145,7 @@ impl StdForm<'_> {
             };
             let _ = write!(init, "{n}: {read}, ");
         }
-        if m.others.is_some() {
-            let _ = write!(init, "{}: ::std::vec::Vec::new(), ", names.others);
-        } else if m.additional == Additional::Keep {
-            let _ = write!(init, "{}: ::std::string::String::new(), ", names.others);
-        }
+        init.push_str(&binary::empty_others(m));
         format!("Ok({} {{ {init}}})", self.model_name(i))
     }
 
